@@ -44,14 +44,13 @@ def fetch_recent_matches(url, headers):
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching recent match data: {e}")
         return None
-
 def process_recent_matches(data):
     """Processes recent match data to extract team and venue details."""
     recent_match_data = []
     if data and 'typeMatches' in data:
         for match_type_entry in data['typeMatches']:
             if 'seriesMatches' in match_type_entry:
-                for series_match_entry in series_match_entry['seriesMatches']:
+                for series_match_entry in match_type_entry['seriesMatches']: # Corrected line
                     if 'seriesAdWrapper' in series_match_entry and 'matches' in series_match_entry['seriesAdWrapper']:
                         for match in series_match_entry['seriesAdWrapper']['matches']:
                             if 'matchInfo' in match:
@@ -146,6 +145,7 @@ def process_recent_matches(data):
 
 
     return df_recent_matches
+
 
 def display_live_matches(data):
     """Processes and displays live match data in the Streamlit app."""
