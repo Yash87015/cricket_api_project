@@ -82,7 +82,7 @@ st.subheader("📄 Project Documentation")
 st.markdown(
     """
     Full documentation is available here:  
-    [📘 Cricket Analytics Documentation](https://github.com/your-username/cricket-analytics/wiki)  
+    [📘 Cricket Analytics Documentation](https://github.com/Yash87015/cricket_api_project)  
 
     ---
     """
