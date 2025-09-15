@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import os
-import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime, timedelta
 
