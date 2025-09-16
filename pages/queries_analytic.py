@@ -769,11 +769,11 @@ WHERE
     );
 """
 close_t20_matches_df = pd.read_sql_query(query_close_t20_matches, conn2)
-display(close_t20_matches_df.head())
+
 
 # Combine the Match IDs from both DataFrames
 close_match_ids = pd.concat([close_odi_matches_df['Match ID'], close_t20_matches_df['Match ID']]).unique().tolist()
-print(f"Number of unique close match IDs found: {len(close_match_ids)}")
+
 
 query_odi_batting_in_close_matches = f"""
 SELECT
@@ -787,7 +787,7 @@ WHERE
     AND runs IS NOT NULL;
 """
 odi_batting_in_close_matches_df = pd.read_sql_query(query_odi_batting_in_close_matches, conn1)
-display(odi_batting_in_close_matches_df.head())
+
 
 query_t20_batting_in_close_matches = f"""
 SELECT
