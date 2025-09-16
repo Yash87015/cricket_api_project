@@ -21,21 +21,10 @@ st.title("Cricket Data Analysis")
 
 st.header("Question 1: List the top 10 ODI batsmen by rating.")
 st.markdown("Show player name, team, rating, and career span. Display the highest rated player first.")
-query_top_odi_batters = """
-SELECT
-    Player,
-    Team,
-    Rating,
-    Span
-FROM
-    odi_bat_ranking
-ORDER BY
-    Rating DESC
-LIMIT 10;
-"""
+query_1_recent = """ select id,name,fullName,role from players WHERE teamName = 'IND'  """
 try:
-    top_odi_batters_df = pd.read_sql_query(query_top_odi_batters, conn1)
-    st.dataframe(top_odi_batters_df)
+    query_1_recent = pd.read_sql_query(query_1_recent, conn1)
+    st.dataframe(query_1_recent)
 except Exception as e:
     st.error(f"Error executing Question 1 query: {e}")
 
