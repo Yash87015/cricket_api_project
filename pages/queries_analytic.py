@@ -1583,13 +1583,13 @@ test_player_ranking_unique = test_player_ranking.drop_duplicates(subset=['Player
 
 
 # final result display
-st.dropdown("test players performance")
+st.markdown("test players performance")
 st.dataframe(test_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
 
-st.dropdown("odi players performance")
+st.markdown("odi players performance")
 st.dataframe(odi_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
 
-st.dropdown("T20 players performance")
+st.markdown("T20 players performance")
 st.dataframe(t20_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
 
 
