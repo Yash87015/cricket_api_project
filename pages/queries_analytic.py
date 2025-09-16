@@ -1229,3 +1229,71 @@ final_economical_bowlers_df = pd.merge(filtered_economical_bowlers_df, combined_
 
 # Select and display result the requested columns, ordered by economy rate (lowest first)
 st.dataframe(final_economical_bowlers_df[['player_name', 'overall_economy_rate', 'total_wickets']].sort_values(by='overall_economy_rate'))
+
+st.header("Question 19 Determine which batsmen are most consistent in their scoring. Calculate the average runs scored and the standard deviation of runs for each player. Only include players who have faced at least 10 balls per innings and played since 2022. A lower standard deviation indicates more consistent performance.")
+st.markdown("display most valuble batsmen  but using old data till 2024 only t20 and odi data .")
+
+# Find consistent batsmen in ODI from conn1
+query_odi_consistency = """
+SELECT
+    ob.batsman AS player_id,
+    ob.runs,
+    ob.balls,
+    om."Match Date"
+FROM
+    odi_bat ob
+JOIN
+    odi_match om ON ob."Match ID" = om."Match ID"
+WHERE
+    CAST(SUBSTR(om."Match Date", 1, 4) AS INTEGER) >= 2022
+    AND ob.balls IS NOT NULL
+    AND ob.balls >= 10;
+"""
+odi_consistency_df = pd.read_sql_query(query_odi_consistency, conn1)
+
+# Find consistent batsmen in T20 from conn2
+query_t20_consistency = """
+SELECT
+    tb.batsman AS player_id,
+    tb.runs,
+    tb.balls,
+    tm."Match Date"
+FROM
+    t20_bat tb
+JOIN
+    t20_match tm ON tb."Match ID" = tm."Match ID"
+WHERE
+    CAST(SUBSTR(tm."Match Date", 1, 4) AS INTEGER) >= 2022
+    AND tb.balls IS NOT NULL
+    AND tb.balls >= 10;
+"""
+t20_consistency_df = pd.read_sql_query(query_t20_consistency, conn2)
+
+# Combine the data from both formats
+combined_consistency_df = pd.concat([odi_consistency_df, t20_consistency_df])
+
+# Calculate average runs and standard deviation of runs for each player
+player_consistency_stats = combined_consistency_df.groupby('player_id').agg(
+    average_runs=('runs', 'mean'),
+    std_dev_runs=('runs', 'std'),
+    total_innings=('runs', 'count')
+).reset_index()
+
+# Filter out players with less than 2 innings (std deviation is NaN for 1 inning)
+player_consistency_stats = player_consistency_stats[player_consistency_stats['total_innings'] >= 2].copy()
+
+# Fetch player names from combined player names DataFrame
+# Re-creating combined_player_names_df for completeness if the kernel was reset or cell wasn't run
+query_odi_player_names = """SELECT player_id, player_name FROM odi_player;"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """SELECT player_id, player_name FROM t20_player;"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df]).drop_duplicates(subset=['player_id'])
+
+# Merge with player names
+final_consistency_df = pd.merge(player_consistency_stats, combined_player_names_df, on='player_id', how='left')
+
+# Select and display result the requested columns, sorted by standard deviation (lowest first)
+st.dataframe(final_consistency_df[['player_name', 'average_runs', 'std_dev_runs']].sort_values(by='std_dev_runs'))
