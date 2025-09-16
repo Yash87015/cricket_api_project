@@ -109,18 +109,20 @@ query_top_odi_batters_new = """
 SELECT
     p.fullName,
     p.role,
-    bs."Highest - ODI",
-    bs."Runs - ODI",
-    bs."Average - ODI",
-    bs."100s - ODI"
+    MAX(bs."Highest - ODI") AS "Highest - ODI", -- Select max highest score
+    SUM(bs."Runs - ODI") AS "Runs - ODI", -- Sum runs in case of multiple entries per player
+    AVG(bs."Average - ODI") AS "Average - ODI", -- Average the average if multiple entries
+    SUM(bs."100s - ODI") AS "100s - ODI" -- Sum centuries
 FROM
     players p
 JOIN
     batting_stats bs ON p.id = bs.player_id
 WHERE
     bs."Runs - ODI" IS NOT NULL
+GROUP BY
+    p.fullName, p.role -- Group by player name and role to handle potential different roles for same name
 ORDER BY
-    bs."Runs - ODI" DESC
+    "Runs - ODI" DESC
 LIMIT 10;
 """
 try:
