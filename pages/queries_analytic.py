@@ -1050,3 +1050,80 @@ final_player_performance_display_df = player_close_match_performance_summary[['p
 
 # display result
 st.dataframe(final_player_performance_display_df.sort_values(by='close_matches_won_by_team', ascending=False))
+
+
+st.header("Q16 Track how players' batting performance changes over different years. For matches since 2020, show each player's average runs per match and average strike rate for each year. Only include players who played at least 5 matches in that year.")
+st.markdown("Player batting perfomance  but using old data till 2024 only t20 and odi data .")
+
+# Track batting performance over different years (since 2020) for ODI from conn1
+query_odi_yearly_batting = """
+SELECT
+    ob.batsman AS player_id,
+    CAST(SUBSTR(om."Match Date", 1, 4) AS INTEGER) AS match_year,
+    SUM(ob.runs) AS total_runs,
+    SUM(ob.balls) AS total_balls,
+    COUNT(DISTINCT ob."Match ID") AS matches_played
+FROM
+    odi_bat ob
+JOIN
+    odi_match om ON ob."Match ID" = om."Match ID"
+WHERE
+    CAST(SUBSTR(om."Match Date", 1, 4) AS INTEGER) >= 2020 AND ob.runs IS NOT NULL
+GROUP BY
+    ob.batsman, match_year;
+"""
+odi_yearly_batting_df = pd.read_sql_query(query_odi_yearly_batting, conn1)
+
+# Track batting performance over different years (since 2020) for T20 from conn2
+query_t20_yearly_batting = """
+SELECT
+    tb.batsman AS player_id,
+    CAST(SUBSTR(tm."Match Date", 1, 4) AS INTEGER) AS match_year,
+    SUM(tb.runs) AS total_runs,
+    SUM(tb.balls) AS total_balls,
+    COUNT(DISTINCT tb."Match ID") AS matches_played
+FROM
+    t20_bat tb
+JOIN
+    t20_match tm ON tb."Match ID" = tm."Match ID"
+WHERE
+    CAST(SUBSTR(tm."Match Date", 1, 4) AS INTEGER) >= 2020 AND tb.runs IS NOT NULL
+GROUP BY
+    tb.batsman, match_year;
+"""
+t20_yearly_batting_df = pd.read_sql_query(query_t20_yearly_batting, conn2)
+
+# Combine the yearly batting data from ODI and T20
+combined_yearly_batting_df = pd.concat([odi_yearly_batting_df, t20_yearly_batting_df])
+
+# Group by player and year to aggregate stats across formats for that year
+aggregated_yearly_batting_df = combined_yearly_batting_df.groupby(['player_id', 'match_year']).agg(
+    total_runs=('total_runs', 'sum'),
+    total_balls=('total_balls', 'sum'),
+    matches_played=('matches_played', 'sum')
+).reset_index()
+
+# Calculate average runs per match and average strike rate
+aggregated_yearly_batting_df['average_runs_per_match'] = aggregated_yearly_batting_df['total_runs'] / aggregated_yearly_batting_df['matches_played']
+aggregated_yearly_batting_df['average_strike_rate'] = (aggregated_yearly_batting_df['total_runs'] / aggregated_yearly_batting_df['total_balls']) * 100
+
+# Filter for players who played at least 5 matches in that year
+filtered_yearly_batting_df = aggregated_yearly_batting_df[aggregated_yearly_batting_df['matches_played'] >= 5].copy()
+
+# Fetch player names from conn1 and conn2 (or conn3 if needed) - using conn1 and conn2 player tables
+query_odi_player_names = """SELECT player_id, player_name FROM odi_player;"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """SELECT player_id, player_name FROM t20_player;"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+# Combine player names from both databases and remove duplicates
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df]).drop_duplicates(subset=['player_id'])
+
+
+# Merge with player names
+final_yearly_batting_df = pd.merge(filtered_yearly_batting_df, combined_player_names_df, on='player_id', how='left')
+
+
+# display result
+st.dataframe(final_yearly_batting_df[['player_name', 'match_year', 'average_runs_per_match', 'average_strike_rate']].sort_values(by=['match_year', 'player_name']))
