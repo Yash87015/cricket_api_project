@@ -1398,3 +1398,197 @@ final_player_format_stats_df.rename(columns={'Player': 'player_name'}, inplace=T
 
 # final result display
 st.dataframe(final_player_format_stats_df)
+
+st.header("Question 21 Create a comprehensive performance ranking system for players. Combine their batting performance (runs scored, batting average, strike rate), bowling performance (wickets taken, bowling average, economy rate), and fielding performance (catches, stumpings) into a single weighted score. Use this formula and rank players:")
+st.markdown("point system :- Batting points: (runs_scored × 0.01) + (batting_average × 0.5) + (strike_rate × 0.3) Bowling points: (wickets_taken × 2) + (50 - bowling_average) × 0.5) + ((6 - economy_rate) × 2) Fielding points: (catches × 3) + (stumpings × 5) Rank the top performers in each cricket format. Same data set as previous questions")
+
+# Fetch available batting statistics for Test matches
+query_test_batting = """
+SELECT
+    Player,
+    Runs,
+    Ave AS BattingAverage,
+    Inns
+FROM
+    batt_test_stats;
+"""
+test_batting_df = pd.read_sql_query(query_test_batting, conn)
+
+# Fetch batting statistics for ODI matches
+query_odi_batting = """
+SELECT
+    Player,
+    Runs,
+    Ave AS BattingAverage,
+    SR AS StrikeRate,
+    Inns
+FROM
+    batt_odi_stats;
+"""
+odi_batting_df = pd.read_sql_query(query_odi_batting, conn)
+
+# Fetch batting statistics for T20 matches
+query_t20_batting = """
+SELECT
+    Player,
+    Runs,
+    Ave AS BattingAverage,
+    SR AS StrikeRate,
+    Inns
+FROM
+    batt_t20_stats;
+"""
+t20_batting_df = pd.read_sql_query(query_t20_batting, conn)
+
+# Fetch bowling statistics for Test matches
+query_test_bowling = """
+SELECT
+    Player,
+    Wkts AS Wickets,
+    Ave AS BowlingAverage,
+    Econ AS EconomyRate
+FROM
+    bowl_test_stats;
+"""
+test_bowling_df = pd.read_sql_query(query_test_bowling, conn)
+
+# Fetch bowling statistics for ODI matches
+query_odi_bowling = """
+SELECT
+    Player,
+    Wkts AS Wickets,
+    Ave AS BowlingAverage,
+    Econ AS EconomyRate
+FROM
+    bowl_odi_stats;
+"""
+odi_bowling_df = pd.read_sql_query(query_odi_bowling, conn)
+
+# Fetch bowling statistics for T20 matches
+query_t20_bowling = """
+SELECT
+    Player,
+    Wkts AS Wickets,
+    Ave AS BowlingAverage,
+    Econ AS EconomyRate
+FROM
+    bowl_t20_stats;
+"""
+t20_bowling_df = pd.read_sql_query(query_t20_bowling, conn)
+
+
+# Fetch fielding statistics for Test matches
+query_test_fielding = """
+SELECT
+    Player,
+    Ct AS Catches,
+    St AS Stumpings
+FROM
+    field_test_stats;
+"""
+test_fielding_df = pd.read_sql_query(query_test_fielding, conn)
+
+# Fetch fielding statistics for ODI matches
+query_odi_fielding = """
+SELECT
+    Player,
+    Ct AS Catches,
+    St AS Stumpings
+FROM
+    field_odi_stats;
+"""
+odi_fielding_df = pd.read_sql_query(query_odi_fielding, conn)
+
+# Fetch fielding statistics for T20 matches
+query_t20_fielding = """
+SELECT
+    Player,
+    Ct AS Catches,
+    St AS Stumpings
+FROM
+    field_t20_stats;
+"""
+t20_fielding_df = pd.read_sql_query(query_t20_fielding, conn)
+
+# Function to calculate points for a given format
+def calculate_points(batting_df, bowling_df, fielding_df, format_name):
+    # Merge dataframes for the current format
+    merged_df = batting_df.merge(bowling_df, on='Player', how='left').merge(fielding_df, on='Player', how='left')
+
+    # Convert relevant columns to numeric, coercing errors and filling NaN with 0
+    cols_to_numeric = ['Runs', 'BattingAverage', 'StrikeRate', 'Wickets', 'BowlingAverage', 'EconomyRate', 'Catches', 'Stumpings', 'Inns']
+    for col in cols_to_numeric:
+        if col in merged_df.columns:
+            merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0)
+        else:
+            # Add column with 0s if it doesn't exist (e.g., StrikeRate for Test)
+            merged_df[col] = 0
+
+    # Calculate Batting Points
+    # Exclude Strike Rate for Test format
+    if format_name == 'Test':
+        merged_df['Batting Points'] = (merged_df['Runs'] * 0.01) + (merged_df['BattingAverage'] * 0.5)
+    else:
+        # Handle potential division by zero if StrikeRate was manually calculated and is 0
+        merged_df['StrikeRate_calc'] = merged_df['StrikeRate'].replace(0, np.nan)
+        merged_df['Batting Points'] = (merged_df['Runs'] * 0.01) + (merged_df['BattingAverage'] * 0.5) + (merged_df['StrikeRate_calc'].fillna(0) * 0.3)
+        merged_df = merged_df.drop(columns=['StrikeRate_calc']) # Drop the temporary column
+
+
+    # Calculate Bowling Points
+    # Handle potential division by zero or infinity for BowlingAverage and EconomyRate
+    merged_df['BowlingAverage_calc'] = merged_df['BowlingAverage'].replace([np.inf, -np.inf], np.nan).fillna(50) # Treat inf as high average (50)
+    merged_df['EconomyRate_calc'] = merged_df['EconomyRate'].replace([np.inf, -np.inf], np.nan).fillna(6) # Treat inf as high economy (6)
+
+    # Cap points from average and economy at 0 if they are above the threshold
+    merged_df['BowlingPoints_Avg'] = (50 - merged_df['BowlingAverage_calc']) * 0.5
+    merged_df['BowlingPoints_Avg'] = merged_df['BowlingPoints_Avg'].apply(lambda x: max(0, x)) # Cap at 0
+
+    merged_df['BowlingPoints_Econ'] = (6 - merged_df['EconomyRate_calc']) * 2
+    merged_df['BowlingPoints_Econ'] = merged_df['BowlingPoints_Econ'].apply(lambda x: max(0, x)) # Cap at 0
+
+    merged_df['Bowling Points'] = (merged_df['Wickets'] * 2) + merged_df['BowlingPoints_Avg'] + merged_df['BowlingPoints_Econ']
+
+    merged_df = merged_df.drop(columns=['BowlingAverage_calc', 'EconomyRate_calc', 'BowlingPoints_Avg', 'BowlingPoints_Econ']) # Drop temporary columns
+
+
+    # Calculate Fielding Points
+    merged_df['Fielding Points'] = (merged_df['Catches'] * 3) + (merged_df['Stumpings'] * 5)
+
+    # Calculate Total Score
+    merged_df['Total Score'] = merged_df['Batting Points'] + merged_df['Bowling Points'] + merged_df['Fielding Points']
+
+    # Keep only the required columns
+    return merged_df[['Player', 'Batting Points', 'Bowling Points', 'Fielding Points', 'Total Score']].copy()
+
+# Calculate points for each format
+test_player_points = calculate_points(test_batting_df, test_bowling_df, test_fielding_df, 'Test')
+odi_player_points = calculate_points(odi_batting_df, odi_bowling_df, odi_fielding_df, 'ODI')
+t20_player_points = calculate_points(t20_batting_df, t20_bowling_df, t20_fielding_df, 'T20')
+
+# Rank players within each format by Total Score
+test_player_ranking = test_player_points.sort_values(by='Total Score', ascending=False).reset_index(drop=True)
+odi_player_ranking = odi_player_points.sort_values(by='Total Score', ascending=False).reset_index(drop=True)
+t20_player_ranking = t20_player_points.sort_values(by='Total Score', ascending=False).reset_index(drop=True)
+
+# Remove duplicate player names, keeping the first occurrence (highest ranked)
+test_player_ranking_unique = test_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True)
+odi_player_ranking_unique = odi_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True)
+t20_player_ranking_unique = t20_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True)
+
+# Remove duplicate player names, keeping the first occurrence (which is the highest ranked due to sorting)
+test_player_ranking_unique = test_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True)
+
+
+
+# final result display
+st.dropdown("test players performance")
+st.dataframe(test_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
+
+st.dropdown("odi players performance")
+st.dataframe(odi_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
+
+st.dropdown("T20 players performance")
+st.dataframe(t20_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
+
+
