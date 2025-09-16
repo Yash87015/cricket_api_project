@@ -53,25 +53,6 @@ try:
 except Exception as e:
     st.error(f"Error executing Question from old 1 query: {e}")
 
-st.markdown("all indian player name")
-query_india_players = """
-SELECT
-    tp.player_id,
-    tp.player_name,
-    tp.batting_style,
-    tp.bowling_style,
-    tm."Team1 Name" AS country
-FROM
-    t20_player tp
-JOIN
-    t20_match tm ON tp.country_id = tm."Team1 ID"
-WHERE
-    tm."Team1 Name" = 'India'
-GROUP BY
-    tp.player_id;
-"""
-india_players_df = pd.read_sql_query(query_india_players, conn2)
-st.dataframe(india_players_df)
 
 st.header("Question 2 Show all cricket matches that were played in the last 30 days. Include the match description, both team names, venue name with city, and the match date. Sort by most recent matches first.")
 st.markdown("Recent last matches last 30 days from collacted by crickbuss api")
@@ -95,31 +76,6 @@ try:
 except Exception as e:
     st.error(f"Error executing Question 2 query: {e}")
 
-
-st.header("Question 2: Find the average number of matches played by players in different roles.")
-st.markdown("Show the role and the average number of matches played for that role.")
-query_avg_matches_by_role = """
-SELECT
-    p.role,
-    AVG(
-        CAST(bs."Matches - Test" AS REAL) +
-        CAST(bs."Matches - ODI" AS REAL) +
-        CAST(bs."Matches - T20" AS REAL)
-    ) AS average_matches_played
-FROM
-    players p
-JOIN
-    batting_stats bs ON p.id = bs.player_id
-WHERE
-    p.role IS NOT NULL
-GROUP BY
-    p.role;
-"""
-try:
-    avg_matches_by_role_df = pd.read_sql_query(query_avg_matches_by_role, conn3)
-    st.dataframe(avg_matches_by_role_df)
-except Exception as e:
-    st.error(f"Error executing Question 2 query: {e}")
 
 
 st.header("Question 3: List the top 10 highest run scorers in ODI cricket.")
