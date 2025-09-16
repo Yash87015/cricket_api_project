@@ -358,3 +358,14 @@ final_allrounders_df = pd.concat([odi_allrounders, t20_allrounders])
 
 # display result
 st.dataframe(final_allrounders_df)
+
+st.header("Question 10 Get details of the last 20 completed matches. Show match description, both team names, winning team, victory margin, victory type (runs/wickets), and venue name. Display most recent matches first.")
+st.markdown("Show the match description, both team names, winning team, victory margin, victory type, and venue name.")
+query_last_20_matche = """ select * from match_list where state = 'Complete' limit 20 """
+
+# display result
+try:
+    last_20_matches_df = pd.read_sql_query(query_last_20_matche, conn3)
+    st.dataframe(last_20_matches_df)
+except Exception as e:
+    st.error(f"Error executing Question 10 query: {e}")
