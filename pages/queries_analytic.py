@@ -28,29 +28,6 @@ try:
 except Exception as e:
     st.error(f"Error executing Question 1 query: {e}")
 
-st.markdown("from old data getplayer information.")
-query_india_players = """
-SELECT
-    tp.player_id,
-    tp.player_name,
-    tp.batting_style,
-    tp.bowling_style,
-    tm."Team1 Name" AS country
-FROM
-    t20_player tp
-JOIN
-    t20_match tm ON tp.country_id = tm."Team1 ID"
-WHERE
-    tm."Team1 Name" = 'India'
-GROUP BY
-    tp.player_id;
-"""
-
-try:
-    india_players_df = pd.read_sql_query(query_india_players, conn2)
-    st.dataframe(india_players_df)
-except:
-    st.error(f"Error excution question 1.2 query:{e}")
 
 st.header("Question 2: Find the average number of matches played by players in different roles.")
 st.markdown("Show the role and the average number of matches played for that role.")
