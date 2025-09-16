@@ -1595,16 +1595,7 @@ st.dataframe(t20_player_ranking.drop_duplicates(subset=['Player']).reset_index(d
 
 
 st.header("Question 22 Build a head-to-head match prediction analysis between teams. For each pair of teams that have played at least 5 matches against each other in the last 3 years, calculate:")
-st.markdown("
-- Total matches played between them
-
-- Wins for each team
-
-- Average victory margin when each team wins
-
-Performance when batting first vs bowling first at different venues
-
-- Overall win percentage for each team in this head-to-head record")
+st.markdown("- Total matches played between them - Wins for each team - Average victory margin when each team wins - Performance when batting first vs bowling first at different venues,- Overall win percentage for each team in this head-to-head record")
 
 
 # Get the current year and calculate the year 3 years ago
