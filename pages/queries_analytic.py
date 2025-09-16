@@ -232,28 +232,19 @@ except Exception as e:
 st.header("Question 7: Find the highest individual batting score achieved in each cricket format (Test, ODI, T20I).")
 st.markdown("Display the format and the highest score for that format.")
 
-# Assuming 'Highest - Test', 'Highest - ODI', 'Highest - T20' columns exist in batting_stats
-query_highest_scores = """
-SELECT
-    'Test' AS Format,
-    MAX("Highest - Test") AS HighestScore
-FROM batting_stats
-UNION
-SELECT
-    'ODI' AS Format,
-    MAX("Highest - ODI") AS HighestScore
-FROM batting_stats
-UNION
-SELECT
-    'T20' AS Format,
-    MAX("Highest - T20") AS HighestScore
-FROM batting_stats;
-"""
-try:
-    highest_scores_df = pd.read_sql_query(query_highest_scores, conn3)
-    st.dataframe(highest_scores_df)
-except Exception as e:
-    st.error(f"Error executing Question 7 query: {e}")
+players_df = pd.read_sql_query('SELECT id, fullName, role FROM players', conn3)
+
+highest_scores_per_player = batting_stats_df.merge(players_df, left_on='player_id', right_on='id', how='inner')
+
+# Group by player and find the maximum highest score in each format
+highest_scores_per_player = highest_scores_per_player.groupby(['player_id', 'fullName', 'role']).agg({
+    'Highest - Test': 'max',
+    'Highest - ODI': 'max',
+    'Highest - T20': 'max' # Using 'Highest - T20' as per dataframe columns
+}).reset_index()
+
+# display result
+st.dataframe(highest_scores_per_player)
 
 
 st.header("Question 8: Show all cricket series that started in the year 2024.")
