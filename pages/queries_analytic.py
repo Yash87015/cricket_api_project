@@ -653,3 +653,87 @@ except Exception as e:
     st.error(f"Error executing Question 13 query: {e}")
 
 
+st.header("Question 14 Examine bowling performance at different venues. For bowlers who have played at least 3 matches at the same venue, calculate their average economy rate, total wickets taken, and number of matches played at each venue. Focus on bowlers who bowled at least 4 overs in each match.")
+st.markdown("bowler perfomance  but using old data till 2024 only t20 and odi data .")
+
+query_odi_venue_bowling = """
+WITH BowlerVenueStats AS (
+    SELECT
+        ob."bowler id",
+        op.player_name,
+        om."Match Venue (Stadium)" AS venue,
+        ob.overs,
+        ob.wickets,
+        ob.economy,
+        om."Match ID"
+    FROM
+        odi_bowl ob
+    JOIN
+        odi_match om ON ob."Match ID" = om."Match ID"
+    JOIN
+        odi_player op ON ob."bowler id" = op.player_id
+    WHERE
+        ob.overs >= 4 -- Filter for bowlers who bowled at least 4 overs in the innings
+)
+SELECT
+    player_name,
+    venue,
+    COUNT(DISTINCT "Match ID") AS matches_played,
+    AVG(economy) AS average_economy_rate,
+    SUM(wickets) AS total_wickets_taken
+FROM
+    BowlerVenueStats
+GROUP BY
+    player_name, venue
+HAVING
+    COUNT(DISTINCT "Match ID") >= 3 -- Filter for bowlers who played at least 3 matches at the same venue
+ORDER BY
+    matches_played DESC, average_economy_rate ASC;
+"""
+odi_venue_bowling_df = pd.read_sql_query(query_odi_venue_bowling, conn1)
+
+# Analyze bowling performance at different venues for T20 using conn2
+query_t20_venue_bowling = """
+WITH BowlerVenueStats AS (
+    SELECT
+        tb."bowler id",
+        tp.player_name,
+        tm."Match Venue (Stadium)" AS venue,
+        tb.overs,
+        tb.wickets,
+        tb.economy,
+        tm."Match ID"
+    FROM
+        t20_bowl tb
+    JOIN
+        t20_match tm ON tb."Match ID" = tm."Match ID"
+    JOIN
+        t20_player tp ON tb."bowler id" = tp.player_id
+    WHERE
+        tb.overs >= 4 -- Filter for bowlers who bowled at least 4 overs in the innings
+)
+SELECT
+    player_name,
+    venue,
+    COUNT(DISTINCT "Match ID") AS matches_played,
+    AVG(economy) AS average_economy_rate,
+    SUM(wickets) AS total_wickets_taken
+FROM
+    BowlerVenueStats
+GROUP BY
+    player_name, venue
+HAVING
+    COUNT(DISTINCT "Match ID") >= 3 -- Filter for bowlers who played at least 3 matches at the same venue
+ORDER BY
+    matches_played DESC, average_economy_rate ASC;
+"""
+t20_venue_bowling_df = pd.read_sql_query(query_t20_venue_bowling, conn2)
+
+combined_venue_bowling_df = pd.concat([odi_venue_bowling_df, t20_venue_bowling_df])
+
+# Display the combined results, sorted by matches played and then average economy rate
+combined_venue_bowling_df = combined_venue_bowling_df.sort_values(by=['matches_played', 'average_economy_rate'], ascending=[False, True])
+
+
+# display result
+st.dataframe(combined_venue_bowling_df)
