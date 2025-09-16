@@ -10,9 +10,9 @@ def get_connections():
     # Use os.path.join for cross-platform compatibility
     # Assuming databases are in a 'pages' directory relative to the script
     db_dir = os.path.dirname(__file__)
-    conn1 = sqlite3.connect(os.path.join(db_dir, 'old_odi_data.db'))
-    conn2 = sqlite3.connect(os.path.join(db_dir, 'old_T20_data.db'))
-    conn3 = sqlite3.connect(os.path.join(db_dir, 'crickbuzz.db'))
+    conn1 = sqlite3.connect(os.path.join(db_dir, 'old_odi_data.db'),check_same_thread=False)
+    conn2 = sqlite3.connect(os.path.join(db_dir, 'old_T20_data.db'),check_same_thread=False)
+    conn3 = sqlite3.connect(os.path.join(db_dir, 'crickbuzz.db'),check_same_thread=False)
     return conn1, conn2, conn3
 
 conn1, conn2, conn3 = get_connections()
