@@ -431,3 +431,138 @@ multi_format_players_df = merged_df[merged_df['FormatsPlayed'] >= 2].copy()
 
 # final result display
 st.dataframe(multi_format_players_df[['fullName', 'Runs - Test', 'Runs - ODI', 'Runs - T20', 'OverallAverage']].drop_duplicates())
+
+
+st.header("Question 12 Analyze each international team's performance when playing at home versus playing away. Determine whether each team played at home or away based on whether the venue country matches the team's country. Count wins for each team in both home and away conditions.")
+st.markdown("Show the team name, number of wins when playing at home, and number of wins when playing away using old data till 2024.")
+
+query_t20_match_data = """
+SELECT
+    "Team1 Name" AS team1_name,
+    "Team2 Name" AS team2_name,
+    "Match Venue (Country)" AS venue_country,
+    "Match Result Text"
+FROM
+    t20_match
+WHERE
+    "Match Result Text" IS NOT NULL;
+"""
+t20_match_list_df = pd.read_sql_query(query_t20_match_data, conn2)
+
+# Determine the winning team (reusing the function)
+def get_winning_team(result_text, team1, team2):
+    if ' won ' in result_text:
+        if result_text.startswith(team1 + ' won'):
+            return team1
+        elif result_text.startswith(team2 + ' won'):
+            return team2
+    return None
+
+t20_match_list_df['WinningTeam'] = t20_match_list_df.apply(
+    lambda row: get_winning_team(row['Match Result Text'], row['team1_name'], row['team2_name']),
+    axis=1
+)
+
+# Filter for matches with a winning team
+t20_completed_matches_df = t20_match_list_df[t20_match_list_df['WinningTeam'].notna()].copy()
+
+# Determine Home vs Away status for the winning team (reusing the function)
+def get_home_away_status(winning_team, venue_country, team1, team2):
+    if winning_team == team1:
+        if team1 == venue_country:
+            return 'Home Win'
+        else:
+            return 'Away Win'
+    elif winning_team == team2:
+        if team2 == venue_country:
+            return 'Home Win'
+        else:
+            return 'Away Win'
+    return None
+
+t20_completed_matches_df['WinType'] = t20_completed_matches_df.apply(
+    lambda row: get_home_away_status(row['WinningTeam'], row['venue_country'], row['team1_name'], row['team2_name']),
+    axis=1
+)
+
+# Count wins by team and home/away status
+t20_home_away_wins = t20_completed_matches_df.groupby(['WinningTeam', 'WinType']).size().unstack(fill_value=0)
+
+# Rename columns for clarity
+t20_home_away_wins.columns.name = None
+t20_home_away_wins.rename(columns={'Home Win': 'Home Wins', 'Away Win': 'Away Wins'}, inplace=True)
+
+
+# Calculate total wins and sort
+t20_home_away_wins['Total Wins'] = t20_home_away_wins['Home Wins'] + t20_home_away_wins['Away Wins']
+t20_home_away_wins = t20_home_away_wins.sort_values(by='Total Wins', ascending=False)
+
+# Analyze home vs. away wins for ODI matches using conn1
+query_odi_match_data = """
+SELECT
+    "Team1 Name" AS team1_name,
+    "Team2 Name" AS team2_name,
+    "Match Venue (Country)" AS venue_country,
+    "Match Result Text"
+FROM
+    odi_match
+WHERE
+    "Match Result Text" IS NOT NULL;
+"""
+odi_match_list_df = pd.read_sql_query(query_odi_match_data, conn1)
+
+# Determine the winning team (reusing the function)
+def get_winning_team(result_text, team1, team2):
+    if ' won ' in result_text:
+        if result_text.startswith(team1 + ' won'):
+            return team1
+        elif result_text.startswith(team2 + ' won'):
+            return team2
+    return None
+
+odi_match_list_df['WinningTeam'] = odi_match_list_df.apply(
+    lambda row: get_winning_team(row['Match Result Text'], row['team1_name'], row['team2_name']),
+    axis=1
+)
+
+# Filter for matches with a winning team
+odi_completed_matches_df = odi_match_list_df[odi_match_list_df['WinningTeam'].notna()].copy()
+
+# Determine Home vs Away status for the winning team (reusing the function)
+def get_home_away_status(winning_team, venue_country, team1, team2):
+    if winning_team == team1:
+        if team1 == venue_country:
+            return 'Home Win'
+        else:
+            return 'Away Win'
+    elif winning_team == team2:
+        if team2 == venue_country:
+            return 'Home Win'
+        else:
+            return 'Away Win'
+    return None
+
+odi_completed_matches_df['WinType'] = odi_completed_matches_df.apply(
+    lambda row: get_home_away_status(row['WinningTeam'], row['venue_country'], row['team1_name'], row['team2_name']),
+    axis=1
+)
+
+# Count wins by team and home/away status
+odi_home_away_wins = odi_completed_matches_df.groupby(['WinningTeam', 'WinType']).size().unstack(fill_value=0)
+
+# Rename columns for clarity
+odi_home_away_wins.columns.name = None
+odi_home_away_wins.rename(columns={'Home Win': 'Home Wins', 'Away Win': 'Away Wins'}, inplace=True)
+
+# Calculate total wins and sort
+odi_home_away_wins['Total Wins'] = odi_home_away_wins['Home Wins'] + odi_home_away_wins['Away Wins']
+odi_home_away_wins = odi_home_away_wins.sort_values(by='Total Wins', ascending=False)
+
+# Combine the ODI and T20 home/away win DataFrames
+combined_home_away_wins = pd.concat([odi_home_away_wins, t20_home_away_wins])
+
+# Group by team and sum the home, away, and total wins
+combined_home_away_wins_summary = combined_home_away_wins.groupby('WinningTeam').sum().sort_values(by='Total Wins', ascending=False)
+
+# display result
+st.dataframe(combinened_home_away_wins_summary)
