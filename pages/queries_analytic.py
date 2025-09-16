@@ -53,7 +53,30 @@ try:
 except Exception as e:
     st.error(f"Error executing Question from old 1 query: {e}")
 
-    
+
+st.header("Question 2 Show all cricket matches that were played in the last 30 days. Include the match description, both team names, venue name with city, and the match date. Sort by most recent matches first.")
+st.markdown("Recent last matches last 30 days from collacted by crickbuss api")
+query_recent_matches = """
+SELECT
+    matchDesc,
+    team1_name,
+    team2_name,
+    ground || ', ' || city AS venue_with_city,
+    startDate
+FROM
+    match_list
+WHERE
+    substr(startDate, 1, 10) >= date('now', '-30 days')
+ORDER BY
+    startDate DESC;
+"""
+try:
+    recent_matches_df = pd.read_sql_query(query_recent_matches, conn3)
+    st.dataframe(recent_matches_df)
+except Exception as e:
+    st.error(f"Error executing Question 2 query: {e}")
+
+
 st.header("Question 2: Find the average number of matches played by players in different roles.")
 st.markdown("Show the role and the average number of matches played for that role.")
 query_avg_matches_by_role = """
