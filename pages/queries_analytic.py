@@ -737,3 +737,316 @@ combined_venue_bowling_df = combined_venue_bowling_df.sort_values(by=['matches_p
 
 # display result
 st.dataframe(combined_venue_bowling_df)
+
+
+st.header("Question 15 Identify players who perform exceptionally well in close matches. A close match is defined as one decided by less than 50 runs OR less than 5 wickets. For these close matches, calculate each player's average runs scored, total close matches played, and how many of those close matches their team won when they batted.")
+st.markdown("Player perfomance  but using old data till 2024 only t20 and odi data .")
+
+query_close_odi_matches = """
+SELECT
+    "Match ID"
+FROM
+    odi_match
+WHERE
+    "Match Result Text" LIKE '% won %'
+    AND (
+        ABS("Team1 Runs Scored" - "Team2 Runs Scored") < 50
+        OR ABS("Team1 Wickets Fell" - "Team2 Wickets Fell") < 5
+    );
+"""
+close_odi_matches_df = pd.read_sql_query(query_close_odi_matches, conn1)
+
+query_close_t20_matches = """
+SELECT
+    "Match ID"
+FROM
+    t20_match
+WHERE
+    "Match Result Text" LIKE '% won %'
+    AND (
+        ABS("Team1 Runs Scored" - "Team2 Runs Scored") < 50
+        OR ABS("Team1 Wickets Fell" - "Team2 Wickets Fell") < 5
+    );
+"""
+close_t20_matches_df = pd.read_sql_query(query_close_t20_matches, conn2)
+display(close_t20_matches_df.head())
+
+# Combine the Match IDs from both DataFrames
+close_match_ids = pd.concat([close_odi_matches_df['Match ID'], close_t20_matches_df['Match ID']]).unique().tolist()
+print(f"Number of unique close match IDs found: {len(close_match_ids)}")
+
+query_odi_batting_in_close_matches = f"""
+SELECT
+    "Match ID",
+    batsman AS player_id,
+    runs
+FROM
+    odi_bat
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))})
+    AND runs IS NOT NULL;
+"""
+odi_batting_in_close_matches_df = pd.read_sql_query(query_odi_batting_in_close_matches, conn1)
+display(odi_batting_in_close_matches_df.head())
+
+query_t20_batting_in_close_matches = f"""
+SELECT
+    "Match ID",
+    batsman AS player_id,
+    runs
+FROM
+    t20_bat
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))})
+    AND runs IS NOT NULL;
+"""
+t20_batting_in_close_matches_df = pd.read_sql_query(query_t20_batting_in_close_matches, conn2)
+
+# 1. Query the odi_match table from conn1 to select the "Match ID" and "Match Result Text" columns.
+query_odi_results = """
+SELECT
+    "Match ID",
+    "Match Result Text",
+    "Team1 Name",
+    "Team2 Name"
+FROM
+    odi_match
+WHERE
+    "Match ID" IN ({});
+""".format(','.join(map(str, close_match_ids)))
+odi_match_results_df = pd.read_sql_query(query_odi_results, conn1)
+
+# 2. Query the t20_match table from conn2 to select the "Match ID" and "Match Result Text" columns.
+query_t20_results = """
+SELECT
+    "Match ID",
+    "Match Result Text",
+    "Team1 Name",
+    "Team2 Name"
+FROM
+    t20_match
+WHERE
+    "Match ID" IN ({});
+""".format(','.join(map(str, close_match_ids)))
+t20_match_results_df = pd.read_sql_query(query_t20_results, conn2)
+
+# 3. Combine the two match results DataFrames into a single DataFrame.
+combined_match_results_df = pd.concat([odi_match_results_df, t20_match_results_df])
+
+# 4. Merge the odi_batting_in_close_matches_df with the combined match results DataFrame on the "Match ID" column.
+odi_batting_with_results_df = pd.merge(odi_batting_in_close_matches_df, combined_match_results_df, on="Match ID")
+
+# 5. Merge the t20_batting_in_close_matches_df with the combined match results DataFrame on the "Match ID" column.
+t20_batting_with_results_df = pd.merge(t20_batting_in_close_matches_df, combined_match_results_df, on="Match ID")
+
+# 6. For both the merged ODI and T20 DataFrames, extract the winning team name from the "Match Result Text" column.
+def extract_winning_team(result_text, team1, team2):
+    if ' won ' in result_text:
+        if result_text.startswith(team1 + ' won'):
+            return team1
+        elif result_text.startswith(team2 + ' won'):
+            return team2
+    return None
+
+odi_batting_with_results_df['WinningTeam'] = odi_batting_with_results_df.apply(
+    lambda row: extract_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']), axis=1
+)
+t20_batting_with_results_df['WinningTeam'] = t20_batting_with_results_df.apply(
+    lambda row: extract_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']), axis=1
+)
+
+# 7. Add a new column to both merged DataFrames indicating whether the player's team won the match.
+# Need to join batting data with match data to get the player's team in that innings
+query_odi_batting_with_team = """
+SELECT
+    "Match ID",
+    innings,
+    team,
+    batsman AS player_id,
+    runs
+FROM
+    odi_bat
+WHERE
+    "Match ID" IN ({}) AND runs IS NOT NULL;
+""".format(','.join(map(str, close_match_ids)))
+odi_batting_with_team_df = pd.read_sql_query(query_odi_batting_with_team, conn1)
+
+query_t20_batting_with_team = """
+SELECT
+    "Match ID",
+    innings,
+    team,
+    batsman AS player_id,
+    runs
+FROM
+    t20_bat
+WHERE
+    "Match ID" IN ({}) AND runs IS NOT NULL;
+""".format(','.join(map(str, close_match_ids)))
+t20_batting_with_team_df = pd.read_sql_query(query_t20_batting_with_team, conn2)
+
+# Merge batting data with team information and match results
+odi_batting_full_df = pd.merge(odi_batting_with_team_df, combined_match_results_df, on="Match ID")
+t20_batting_full_df = pd.merge(t20_batting_with_team_df, combined_match_results_df, on="Match ID")
+
+
+odi_batting_full_df['WinningTeam'] = odi_batting_full_df.apply(
+    lambda row: extract_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']), axis=1
+)
+t20_batting_full_df['WinningTeam'] = t20_batting_full_df.apply(
+    lambda row: extract_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']), axis=1
+)
+
+odi_batting_full_df['TeamWonCloseMatch'] = (odi_batting_full_df['team'] == odi_batting_full_df['WinningTeam']).astype(int)
+t20_batting_full_df['TeamWonCloseMatch'] = (t20_batting_full_df['team'] == t20_batting_full_df['WinningTeam']).astype(int)
+
+# 8. Concatenate the processed ODI and T20 DataFrames
+combined_batting_in_close_matches_df = pd.concat([odi_batting_full_df, t20_batting_full_df])
+
+# Identify close matches from conn1 and conn2
+query_close_odi_matches = """
+SELECT
+    "Match ID"
+FROM
+    odi_match
+WHERE
+    "Match Result Text" IS NOT NULL AND (
+        ABS("Team1 Runs Scored" - "Team2 Runs Scored") < 50
+        OR ABS("Team1 Wickets Fell" - "Team2 Wickets Fell") < 5
+    );
+"""
+close_odi_matches_df = pd.read_sql_query(query_close_odi_matches, conn1)
+
+query_close_t20_matches = """
+SELECT
+    "Match ID"
+FROM
+    t20_match
+WHERE
+    "Match Result Text" IS NOT NULL AND (
+        ABS("Team1 Runs Scored" - "Team2 Runs Scored") < 50
+        OR ABS("Team1 Wickets Fell" - "Team2 Wickets Fell") < 5
+    );
+"""
+close_t20_matches_df = pd.read_sql_query(query_close_t20_matches, conn2)
+
+# Combine the Match IDs from both DataFrames
+close_match_ids = pd.concat([close_odi_matches_df['Match ID'], close_t20_matches_df['Match ID']]).unique().tolist()
+
+print(f"Number of unique close match IDs found: {len(close_match_ids)}")
+
+# Fetch batting performance in close matches from conn1 and conn2
+query_odi_batting_in_close_matches = f"""
+SELECT
+    "Match ID",
+    batsman AS player_id,
+    runs,
+    team -- Include team to check if player's team won
+FROM
+    odi_bat
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))})
+    AND runs IS NOT NULL;
+"""
+odi_batting_in_close_matches_df = pd.read_sql_query(query_odi_batting_in_close_matches, conn1)
+
+query_t20_batting_in_close_matches = f"""
+SELECT
+    "Match ID",
+    batsman AS player_id,
+    runs,
+    team -- Include team to check if player's team won
+FROM
+    t20_bat
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))})
+    AND runs IS NOT NULL;
+"""
+t20_batting_in_close_matches_df = pd.read_sql_query(query_t20_batting_in_close_matches, conn2)
+
+# Combine batting data from close matches
+combined_batting_in_close_matches_df = pd.concat([odi_batting_in_close_matches_df, t20_batting_in_close_matches_df])
+
+query_odi_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    odi_player;
+"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    t20_player;
+"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+# Combine player names from both databases
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df]).drop_duplicates(subset=['player_id'])
+
+query_close_odi_results = f"""
+SELECT
+    "Match ID",
+    "Match Result Text",
+    "Team1 Name",
+    "Team2 Name"
+FROM
+    odi_match
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))});
+"""
+close_odi_results_df = pd.read_sql_query(query_close_odi_results, conn1)
+
+query_close_t20_results = f"""
+SELECT
+    "Match ID",
+    "Match Result Text",
+    "Team1 Name",
+    "Team2 Name"
+FROM
+    t20_match
+WHERE
+    "Match ID" IN ({','.join(map(str, close_match_ids))});
+"""
+close_t20_results_df = pd.read_sql_query(query_close_t20_results, conn2)
+
+# Combine close match results
+combined_close_match_results_df = pd.concat([close_odi_results_df, close_t20_results_df])
+
+# Determine winning team (reusing the function)
+def extract_winning_team(result_text, team1, team2):
+    if ' won ' in result_text:
+        if result_text.startswith(team1 + ' won'):
+            return team1
+        elif result_text.startswith(team2 + ' won'):
+            return team2
+    return None
+
+combined_close_match_results_df['WinningTeam'] = combined_close_match_results_df.apply(
+    lambda row: extract_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']), axis=1
+)
+
+# Merge batting data with match results and player names
+batting_with_results_df = pd.merge(combined_batting_in_close_matches_df, combined_close_match_results_df[['Match ID', 'WinningTeam']], on='Match ID', how='left')
+final_close_match_performance_df = pd.merge(batting_with_results_df, combined_player_names_df, on='player_id', how='left')
+
+# Determine if player's team won the close match when they batted
+final_close_match_performance_df['TeamWonCloseMatch'] = (final_close_match_performance_df['team'] == final_close_match_performance_df['WinningTeam']).astype(int)
+
+# Group by player and calculate the requested metrics
+player_close_match_performance_summary = final_close_match_performance_df.groupby('player_id').agg(
+    player_name=('player_name', 'first'), # Get player name
+    average_runs=('runs', 'mean'),
+    total_close_matches_played=('Match ID', 'nunique'),
+    close_matches_won_by_team=('TeamWonCloseMatch', 'sum')
+).reset_index()
+
+# Select and display the requested columns
+final_player_performance_display_df = player_close_match_performance_summary[['player_name', 'average_runs', 'total_close_matches_played', 'close_matches_won_by_team']]
+
+# display result
+st.dataframe(final_player_performance_display_df.sort_values(by='close_matches_won_by_team', ascending=False))
