@@ -1155,3 +1155,77 @@ toss_choice_summary_df['win_percentage'] = (toss_choice_summary_df['toss_winner_
 
 # display result
 st.dataframe(toss_choice_summary_df)
+
+st.header("Q18 Find the most economical bowlers in limited-overs cricket (ODI and T20 formats). Calculate each bowler's overall economy rate and total wickets taken. Only consider bowlers who have bowled in at least 10 matches and bowled at least 2 overs per match on average.")
+st.markdown("display most economical bowler  but using old data till 2024 only t20 and odi data .")
+
+# Find the most economical bowlers in ODI from conn1
+query_odi_economical_bowlers = """
+SELECT
+    ob."bowler id" AS player_id,
+    SUM(ob.overs) AS total_overs,
+    SUM(ob.conceded) AS total_runs_conceded,
+    SUM(ob.wickets) AS total_wickets,
+    COUNT(DISTINCT ob."Match ID") AS matches_bowled
+FROM
+    odi_bowl ob
+WHERE
+    ob.overs IS NOT NULL AND ob.conceded IS NOT NULL AND ob.wickets IS NOT NULL
+GROUP BY
+    ob."bowler id";
+"""
+odi_bowling_stats_df = pd.read_sql_query(query_odi_economical_bowlers, conn1)
+
+# Find the most economical bowlers in T20 from conn2
+query_t20_economical_bowlers = """
+SELECT
+    tb."bowler id" AS player_id,
+    SUM(tb.overs) AS total_overs,
+    SUM(tb.conceded) AS total_runs_conceded,
+    SUM(tb.wickets) AS total_wickets,
+    COUNT(DISTINCT tb."Match ID") AS matches_bowled
+FROM
+    t20_bowl tb
+WHERE
+    tb.overs IS NOT NULL AND tb.conceded IS NOT NULL AND tb.wickets IS NOT NULL
+GROUP BY
+    tb."bowler id";
+"""
+t20_bowling_stats_df = pd.read_sql_query(query_t20_economical_bowlers, conn2)
+
+# Combine the bowling stats from both formats
+combined_bowling_stats_df = pd.concat([odi_bowling_stats_df, t20_bowling_stats_df])
+
+# Group by player and aggregate stats across formats
+aggregated_bowling_stats_df = combined_bowling_stats_df.groupby('player_id').agg(
+    total_overs=('total_overs', 'sum'),
+    total_runs_conceded=('total_runs_conceded', 'sum'),
+    total_wickets=('total_wickets', 'sum'),
+    matches_bowled=('matches_bowled', 'sum')
+).reset_index()
+
+# Calculate overall economy rate
+aggregated_bowling_stats_df['overall_economy_rate'] = (aggregated_bowling_stats_df['total_runs_conceded'] / aggregated_bowling_stats_df['total_overs']) * 6
+
+# Filter based on criteria: at least 10 matches and at least 2 overs per match on average
+filtered_economical_bowlers_df = aggregated_bowling_stats_df[
+    (aggregated_bowling_stats_df['matches_bowled'] >= 10) &
+    (aggregated_bowling_stats_df['total_overs'] / aggregated_bowling_stats_df['matches_bowled'] >= 2)
+].copy()
+
+# Fetch player names from combined player names DataFrame (assuming it was created earlier or create it if not)
+# Re-creating combined_player_names_df for completeness if the kernel was reset or cell wasn't run
+query_odi_player_names = """SELECT player_id, player_name FROM odi_player;"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """SELECT player_id, player_name FROM t20_player;"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df]).drop_duplicates(subset=['player_id'])
+
+
+# Merge with player names
+final_economical_bowlers_df = pd.merge(filtered_economical_bowlers_df, combined_player_names_df, on='player_id', how='left')
+
+# Select and display result the requested columns, ordered by economy rate (lowest first)
+st.dataframe(final_economical_bowlers_df[['player_name', 'overall_economy_rate', 'total_wickets']].sort_values(by='overall_economy_rate'))
