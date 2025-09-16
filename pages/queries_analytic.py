@@ -232,6 +232,7 @@ except Exception as e:
 st.header("Question 7: Find the highest individual batting score achieved in each cricket format (Test, ODI, T20I).")
 st.markdown("Display the format and the highest score for that format.")
 
+batting_stats_df = pd.read_sql_query('select * from batting_stats', conn3)
 players_df = pd.read_sql_query('SELECT id, fullName, role FROM players', conn3)
 
 highest_scores_per_player = batting_stats_df.merge(players_df, left_on='player_id', right_on='id', how='inner')
