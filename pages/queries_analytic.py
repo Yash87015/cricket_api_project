@@ -1102,3 +1102,56 @@ final_yearly_batting_df = pd.merge(filtered_yearly_batting_df, combined_player_n
 
 # display result
 st.dataframe(final_yearly_batting_df[['player_name', 'match_year', 'average_runs_per_match', 'average_strike_rate']].sort_values(by=['match_year', 'player_name']))
+
+st.header("Question 17 Investigate whether winning the toss gives teams an advantage in winning matches. Calculate what percentage of matches are won by the team that wins the toss, broken down by their toss decision (choosing to bat first or bowl first).")
+st.markdown("display result Toss Winner Choice,total_matches,toss_winner_wins,win_percentage  but using old data till 2024 only t20 and odi data .")
+
+# Analyze the impact of winning the toss on match outcomes for ODI matches from conn1
+query_odi_toss_analysis = """
+SELECT
+    "Toss Winner",
+    "Toss Winner Choice",
+    "Match Winner",
+    COUNT(*) AS total_matches,
+    SUM(CASE WHEN "Toss Winner" = "Match Winner" THEN 1 ELSE 0 END) AS toss_winner_wins
+FROM
+    odi_match
+WHERE
+    "Toss Winner" IS NOT NULL AND "Toss Winner Choice" IS NOT NULL AND "Match Winner" IS NOT NULL
+GROUP BY
+    "Toss Winner", "Toss Winner Choice", "Match Winner";
+"""
+odi_toss_analysis_df = pd.read_sql_query(query_odi_toss_analysis, conn1)
+
+# Analyze the impact of winning the toss on match outcomes for T20 matches from conn2
+query_t20_toss_analysis = """
+SELECT
+    "Toss Winner",
+    "Toss Winner Choice",
+    "Match Winner",
+    COUNT(*) AS total_matches,
+    SUM(CASE WHEN "Toss Winner" = "Match Winner" THEN 1 ELSE 0 END) AS toss_winner_wins
+FROM
+    t20_match
+WHERE
+    "Toss Winner" IS NOT NULL AND "Toss Winner Choice" IS NOT NULL AND "Match Winner" IS NOT NULL
+GROUP BY
+    "Toss Winner", "Toss Winner Choice", "Match Winner";
+"""
+t20_toss_analysis_df = pd.read_sql_query(query_t20_toss_analysis, conn2)
+
+# Combine the results from both formats
+combined_toss_analysis_df = pd.concat([odi_toss_analysis_df, t20_toss_analysis_df])
+
+# Group by toss winner choice and calculate total matches and wins for each choice
+toss_choice_summary_df = combined_toss_analysis_df.groupby('Toss Winner Choice').agg(
+    total_matches=('total_matches', 'sum'),
+    toss_winner_wins=('toss_winner_wins', 'sum')
+).reset_index()
+
+# Calculate the percentage of matches won by the toss winner for each choice
+toss_choice_summary_df['win_percentage'] = (toss_choice_summary_df['toss_winner_wins'] / toss_choice_summary_df['total_matches']) * 100
+
+
+# display result
+st.dataframe(toss_choice_summary_df)
