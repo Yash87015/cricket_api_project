@@ -288,3 +288,73 @@ try:
     st.dataframe(combined_2024_series_df)
 except Exception as e:
     st.error(f"Error executing Question 8 query: {e}")
+
+
+st.header("Question 9 :-Find all-rounder players who have scored more than 1000 runs AND taken more than 50 wickets in their career. Display player name, total runs, total wickets, and the cricket format.")
+st.markdown("Show the player name and records but using old data till 2024 combining odi and t20 only and show new player data as well thoes who play recently played as well old records.")
+# Fetch total ODI runs and wickets per player from conn1
+query_odi_stats = """
+SELECT
+    ob.batsman AS player_id,
+    SUM(ob.runs) AS TotalODIRuns,
+    SUM(obowl.wickets) AS TotalODIWickets
+FROM
+    odi_bat ob
+JOIN
+    odi_bowl obowl ON ob.batsman = obowl."bowler id" -- Assuming batsman and bowler id are the same player
+WHERE ob.runs IS NOT NULL AND obowl.wickets IS NOT NULL
+GROUP BY
+    ob.batsman;
+"""
+odi_stats_df = pd.read_sql_query(query_odi_stats, conn1)
+# Fetch total T20 runs and wickets per player from conn2
+query_t20_stats = """
+SELECT
+    tb.batsman AS player_id,
+    SUM(tb.runs) AS TotalT20Runs,
+    SUM(tbowl.wickets) AS TotalT20Wickets
+FROM
+    t20_bat tb
+JOIN
+    t20_bowl tbowl ON tb.batsman = tbowl."bowler id" -- Assuming batsman and bowler id are the same player
+WHERE tb.runs IS NOT NULL AND tbowl.wickets IS NOT NULL
+GROUP BY
+    tb.batsman;
+"""
+t20_stats_df = pd.read_sql_query(query_t20_stats, conn2)
+# Fetch player names and roles from conn3
+query_players_info = """
+SELECT
+    id AS player_id,
+    fullName,
+    role
+FROM
+    players;
+"""
+players_info_df = pd.read_sql_query(query_players_info, conn3)
+# Combine DataFrames and filter for all-rounders meeting criteria
+# Merge ODI and T20 stats with player info
+combined_stats_df = players_info_df.merge(odi_stats_df, on='player_id', how='left')
+combined_stats_df = combined_stats_df.merge(t20_stats_df, on='player_id', how='left')
+
+# Fill NaN values with 0 for players who might not have played in both formats
+combined_stats_df.fillna(0, inplace=True)
+
+# Filter for all-rounders (including Batting Allrounder and Bowling Allrounder)
+allrounders_df = combined_stats_df[combined_stats_df['role'].str.contains('Allrounder', na=False)].copy()
+
+# Check criteria for each format and select relevant columns
+odi_allrounders = allrounders_df[(allrounders_df['TotalODIRuns'] > 1000) & (allrounders_df['TotalODIWickets'] > 50)].copy()
+odi_allrounders['Format'] = 'ODI'
+odi_allrounders = odi_allrounders[['fullName', 'role', 'Format', 'TotalODIRuns', 'TotalODIWickets']].rename(columns={'TotalODIRuns': 'TotalRuns', 'TotalODIWickets': 'TotalWickets'})
+
+t20_allrounders = allrounders_df[(allrounders_df['TotalT20Runs'] > 1000) & (allrounders_df['TotalT20Wickets'] > 50)].copy()
+t20_allrounders['Format'] = 'T20'
+t20_allrounders = t20_allrounders[['fullName', 'role', 'Format', 'TotalT20Runs', 'TotalT20Wickets']].rename(columns={'TotalT20Runs': 'TotalRuns', 'TotalT20Wickets': 'TotalWickets'})
+
+
+# Combine results from both formats
+final_allrounders_df = pd.concat([odi_allrounders, t20_allrounders])
+
+# display result
+st.dataframe(final_allrounders_df)
