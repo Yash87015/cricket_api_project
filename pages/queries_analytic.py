@@ -565,4 +565,4 @@ combined_home_away_wins = pd.concat([odi_home_away_wins, t20_home_away_wins])
 combined_home_away_wins_summary = combined_home_away_wins.groupby('WinningTeam').sum().sort_values(by='Total Wins', ascending=False)
 
 # display result
-st.dataframe(combinened_home_away_wins_summary)
+st.dataframe(combined_home_away_wins_summary)
