@@ -566,3 +566,87 @@ combined_home_away_wins_summary = combined_home_away_wins.groupby('WinningTeam')
 
 # display result
 st.dataframe(combined_home_away_wins_summary)
+
+
+st.header("Question 13:- Identify batting partnerships where two consecutive batsmen (batting positions next to each other) scored a combined total of 100 or more runs in the same innings. Show both player names, their combined partnership runs, and which innings it occurred in.")
+st.markdown("batter partnership but using old data till 2024.")
+
+# Find ODI batting partnerships of 100 or more runs using conn1
+query_odi_partnerships = """
+SELECT
+    op1.player_name AS player1_name,
+    op2.player_name AS player2_name,
+    opat."partnership runs",
+    opat.innings,
+    opat."Match ID"
+FROM
+    odi_pat opat
+JOIN
+    odi_player op1 ON opat.player1 = op1.player_id
+JOIN
+    odi_player op2 ON opat.player2 = op2.player_id
+WHERE
+    opat."partnership runs" >= 100
+ORDER BY
+    opat."partnership runs" DESC;
+"""
+odi_partnerships_df = pd.read_sql_query(query_odi_partnerships, conn1)
+
+# Find T20 batting partnerships of 100 or more runs using conn2
+query_t20_partnerships = """
+SELECT
+    tp1.player_name AS player1_name,
+    tp2.player_name AS player2_name,
+    tpat."partnership runs",
+    tpat.innings,
+    tpat."Match ID"
+FROM
+    t20_pat tpat
+JOIN
+    t20_player tp1 ON tpat.player1 = tp1.player_id
+JOIN
+    t20_player tp2 ON tpat.player2 = tp2.player_id
+WHERE
+    tpat."partnership runs" >= 100
+ORDER BY
+    tpat."partnership runs" DESC;
+"""
+t20_partnerships_df = pd.read_sql_query(query_t20_partnerships, conn2)
+
+# Combine the ODI and T20 partnerships DataFrames
+combined_partnerships_df = pd.concat([odi_partnerships_df, t20_partnerships_df])
+
+# Display the combined results, sorted by partnership runs
+combined_partnerships_df = combined_partnerships_df.sort_values(by='partnership runs', ascending=False)
+
+# display result
+st.dataframe(combined_partnerships_df)
+
+st.markdown("batter partnership but using recent player performance in 2025 that i fetch data from crickbuzz api but only 10 matches ")
+query_innings_partnerships_recent = """
+SELECT
+    p1.fullName AS player1_name,
+    p2.fullName AS player2_name,
+    istats.totalRuns AS partnership_runs,
+    istats.inningsId AS innings,
+    istats.matchId
+FROM
+    innings_stats istats
+JOIN
+    players p1 ON istats.bat1Id = p1.id
+JOIN
+    players p2 ON istats.bat2Id = p2.id
+WHERE
+    istats.playerType = 'Partnership'
+    AND istats.totalRuns >= 100
+ORDER BY
+    istats.totalRuns DESC;
+"""
+innings_partnerships_df = pd.read_sql_query(query_innings_partnerships_recent, conn3)
+
+# display result
+try:
+    innings_partnerships_df = pd.read_sql_query(query_innings_partnerships_recent, conn3)
+    st.dataframe(lnnings_partnerships_df)
+except Exception as e:
+    st.error(f"Error executing Question 13 query: {e}")
