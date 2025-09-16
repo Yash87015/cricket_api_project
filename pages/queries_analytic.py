@@ -14,9 +14,9 @@ def get_connections():
     conn1 = sqlite3.connect(os.path.join(db_dir, 'old_odi_data.db'),check_same_thread=False)
     conn2 = sqlite3.connect(os.path.join(db_dir, 'old_T20_data.db'),check_same_thread=False)
     conn3 = sqlite3.connect(os.path.join(db_dir, 'crickbuzz.db'),check_same_thread=False)
-    return conn1, conn2, conn3
+    return conn, conn1, conn2, conn3
 
-conn1, conn2, conn3 = get_connections()
+conn, conn1, conn2, conn3 = get_connections()
 
 st.title("Cricket Data Analysis")
 
