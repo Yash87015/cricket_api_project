@@ -1298,3 +1298,103 @@ final_consistency_df = pd.merge(player_consistency_stats, combined_player_names_
 
 # Select and display result the requested columns, sorted by standard deviation (lowest first)
 st.dataframe(final_consistency_df[['player_name', 'average_runs', 'std_dev_runs']].sort_values(by='std_dev_runs'))
+
+st.header("Question 20 Analyze how many matches each player has played in different cricket formats and their batting average in each format. Show the count of Test matches, ODI matches, and T20 matches for each player, along with their respective batting averages. Only include players who have played at least 20 total matches across all formats.")
+st.markdown("For this anlyze question i use differnt data set from kaggle that consitance all player stats till 2025.")
+
+# Query batting stats for Test, ODI, and T20 from the players_all_formate database (conn)
+query_test_batting = """
+SELECT
+    Player, -- Corrected column name
+    'Test' AS Format,
+    Mat AS MatchesPlayed,
+    Inns AS Innings,
+    Runs,
+    NO AS NotOut
+FROM
+    batt_test_stats;
+"""
+test_batting_df = pd.read_sql_query(query_test_batting, conn)
+
+query_odi_batting = """
+SELECT
+    Player, -- Corrected column name
+    'ODI' AS Format,
+    Mat AS MatchesPlayed,
+    Inns AS Innings,
+    Runs,
+    NO AS NotOut
+FROM
+    batt_odi_stats;
+"""
+odi_batting_df = pd.read_sql_query(query_odi_batting, conn)
+
+query_t20_batting = """
+SELECT
+    Player, -- Corrected column name
+    'T20' AS Format,
+    Mat AS MatchesPlayed,
+    Inns AS Innings,
+    Runs,
+    NO AS NotOut
+FROM
+    batt_t20_stats;
+"""
+t20_batting_df = pd.read_sql_query(query_t20_batting, conn)
+
+# Convert relevant columns to numeric in each DataFrame before concatenation
+for df in [test_batting_df, odi_batting_df, t20_batting_df]:
+    for col in ['MatchesPlayed', 'Innings', 'Runs', 'NotOut']:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+
+
+# Combine batting data from all formats
+combined_batting_df = pd.concat([test_batting_df, odi_batting_df, t20_batting_df])
+
+# Calculate total matches played across all formats for each player
+total_matches_per_player = combined_batting_df.groupby('Player')['MatchesPlayed'].sum().reset_index() # Grouping by 'Player'
+total_matches_per_player.rename(columns={'MatchesPlayed': 'TotalMatchesAllFormats'}, inplace=True)
+
+# Filter for players who have played at least 20 total matches
+players_with_20_plus_matches = total_matches_per_player[total_matches_per_player['TotalMatchesAllFormats'] >= 20]['Player'].tolist() # Filtering by 'Player'
+
+# Filter the combined batting data to include only these players
+filtered_combined_batting_df = combined_batting_df[combined_batting_df['Player'].isin(players_with_20_plus_matches)].copy() # Filtering by 'Player'
+
+filtered_combined_batting_df['BattingAverage'] = filtered_combined_batting_df.apply(
+    lambda row: row['Runs'] / (row['Innings'] - row['NotOut']) if (row['Innings'] - row['NotOut']) > 0 else 0, # Using 'Innings' column alias
+    axis=1
+)
+
+# Pivot the data to get formats as columns
+pivot_batting_df = filtered_combined_batting_df.pivot_table(
+    index='Player', # Indexing by 'Player'
+    columns='Format',
+    values=['MatchesPlayed', 'BattingAverage'],
+    aggfunc='first' # Use first as there should be only one row per player-format
+).reset_index()
+
+# Flatten the multi-level columns
+pivot_batting_df.columns = ['_'.join(col).strip('_') for col in pivot_batting_df.columns.values]
+
+# Rename columns for clarity
+pivot_batting_df.rename(columns={
+    'MatchesPlayed_ODI': 'ODI_Matches',
+    'MatchesPlayed_T20': 'T20_Matches',
+    'MatchesPlayed_Test': 'Test_Matches',
+    'BattingAverage_ODI': 'ODI_Average',
+    'BattingAverage_T20': 'T20_Average',
+    'BattingAverage_Test': 'Test_Average'
+}, inplace=True)
+
+
+final_player_format_stats_df = pivot_batting_df.copy()
+
+
+# Select and display the requested columns, filling NaN values with 0 for formats not played
+final_player_format_stats_df = final_player_format_stats_df[['Player', 'Test_Matches', 'ODI_Matches', 'T20_Matches', 'Test_Average', 'ODI_Average', 'T20_Average']].fillna(0)
+final_player_format_stats_df.rename(columns={'Player': 'player_name'}, inplace=True) # Rename 'Player' to 'player_name' for consistent output with previous queries
+
+# final result display
+st.dataframe(final_player_format_stats_df)
