@@ -1594,3 +1594,158 @@ st.markdown("T20 players performance")
 st.dataframe(t20_player_ranking.drop_duplicates(subset=['Player']).reset_index(drop=True))
 
 
+st.header("Question 22 Build a head-to-head match prediction analysis between teams. For each pair of teams that have played at least 5 matches against each other in the last 3 years, calculate:")
+st.markdown("
+- Total matches played between them
+
+- Wins for each team
+
+- Average victory margin when each team wins
+
+Performance when batting first vs bowling first at different venues
+
+- Overall win percentage for each team in this head-to-head record")
+
+
+# Get the current year and calculate the year 3 years ago
+current_year = datetime.now().year
+three_years_ago = current_year - 3
+
+# Fetch recent ODI match data
+query_recent_odi_matches = f"""
+SELECT
+    "Match ID",
+    "Match Date",
+    "Team1 Name",
+    "Team2 Name",
+    "Match Result Text",
+    "Team1 Runs Scored",
+    "Team2 Runs Scored",
+    "Team1 Wickets Fell",
+    "Team2 Wickets Fell",
+    "Toss Winner",
+    "Toss Winner Choice",
+    "Match Venue (Country)" AS VenueCountry
+FROM
+    odi_match
+WHERE
+    CAST(SUBSTR("Match Date", 1, 4) AS INTEGER) >= {three_years_ago};
+"""
+recent_odi_matches_df = pd.read_sql_query(query_recent_odi_matches, conn1)
+
+# Fetch recent T20 match data
+query_recent_t20_matches = f"""
+SELECT
+    "Match ID",
+    "Match Date",
+    "Team1 Name",
+    "Team2 Name",
+    "Match Result Text",
+    "Team1 Runs Scored",
+    "Team2 Runs Scored",
+    "Team1 Wickets Fell",
+    "Team2 Wickets Fell",
+    "Toss Winner",
+    "Toss Winner Choice",
+    "Match Venue (Country)" AS VenueCountry
+FROM
+    t20_match
+WHERE
+    CAST(SUBSTR("Match Date", 1, 4) AS INTEGER) >= {three_years_ago};
+"""
+recent_t20_matches_df = pd.read_sql_query(query_recent_t20_matches, conn2)
+
+# Concatenate the DataFrames
+recent_matches_df = pd.concat([recent_odi_matches_df, recent_t20_matches_df])
+
+def standardize_team_pair(row):
+    teams = sorted([row['Team1 Name'], row['Team2 Name']])
+    return '_'.join(teams)
+
+recent_matches_df['TeamPair'] = recent_matches_df.apply(standardize_team_pair, axis=1)
+
+team_pair_counts = recent_matches_df['TeamPair'].value_counts()
+teams_with_5_plus_matches = team_pair_counts[team_pair_counts >= 5].index.tolist()
+filtered_recent_matches_df = recent_matches_df[recent_matches_df['TeamPair'].isin(teams_with_5_plus_matches)].copy()
+
+def analyze_team_pair_head_to_head(df_pair):
+    team1 = df_pair['Team1 Name'].iloc[0]
+    team2 = df_pair['Team2 Name'].iloc[0]
+    team_pair_name = df_pair['TeamPair'].iloc[0]
+
+    total_matches = len(df_pair)
+
+    # Determine winning team
+    def get_winning_team(result_text, t1, t2):
+        if ' won ' in result_text:
+            if result_text.startswith(t1 + ' won'):
+                return t1
+            elif result_text.startswith(t2 + ' won'):
+                return t2
+        return None
+
+    df_pair['WinningTeam'] = df_pair.apply(
+        lambda row: get_winning_team(row['Match Result Text'], row['Team1 Name'], row['Team2 Name']),
+        axis=1
+    )
+
+    # Calculate wins for each team
+    team1_wins = df_pair[df_pair['WinningTeam'] == team1].shape[0]
+    team2_wins = df_pair[df_pair['WinningTeam'] == team2].shape[0]
+
+    # Calculate average victory margin
+    def calculate_victory_margin(row):
+        if row['WinningTeam'] == row['Team1 Name']:
+            if 'runs' in row['Match Result Text']:
+                return abs(row['Team1 Runs Scored'] - row['Team2 Runs Scored'])
+            elif 'wickets' in row['Match Result Text']:
+                return abs(10 - row['Team2 Wickets Fell']) # Assuming 10 wickets in an innings
+        elif row['WinningTeam'] == row['Team2 Name']:
+            if 'runs' in row['Match Result Text']:
+                return abs(row['Team2 Runs Scored'] - row['Team1 Runs Scored'])
+            elif 'wickets' in row['Match Result Text']:
+                return abs(10 - row['Team1 Wickets Fell']) # Assuming 10 wickets in an innings
+        return np.nan
+
+    df_pair['VictoryMargin'] = df_pair.apply(calculate_victory_margin, axis=1)
+
+    avg_margin_team1 = df_pair[df_pair['WinningTeam'] == team1]['VictoryMargin'].mean() if team1_wins > 0 else 0
+    avg_margin_team2 = df_pair[df_pair['WinningTeam'] == team2]['VictoryMargin'].mean() if team2_wins > 0 else 0
+
+    # Analyze performance when batting first vs bowling first at different venues (simplified)
+    # This is a simplified approach focusing on overall wins when batting/bowling first, not per venue
+    team1_bat_first_wins = df_pair[(df_pair['Toss Winner'] == team1) & (df_pair['Toss Winner Choice'] == 'bat') & (df_pair['WinningTeam'] == team1)].shape[0]
+    team1_bowl_first_wins = df_pair[(df_pair['Toss Winner'] == team1) & (df_pair['Toss Winner Choice'] == 'bowl') & (df_pair['WinningTeam'] == team1)].shape[0]
+    team2_bat_first_wins = df_pair[(df_pair['Toss Winner'] == team2) & (df_pair['Toss Winner Choice'] == 'bat') & (df_pair['WinningTeam'] == team2)].shape[0]
+    team2_bowl_first_wins = df_pair[(df_pair['Toss Winner'] == team2) & (df_pair['Toss Winner Choice'] == 'bowl') & (df_pair['WinningTeam'] == team2)].shape[0]
+
+
+    # Calculate overall win percentage
+    team1_win_percentage = (team1_wins / total_matches) * 100 if total_matches > 0 else 0
+    team2_win_percentage = (team2_wins / total_matches) * 100 if total_matches > 0 else 0
+
+    return {
+        'TeamPair': team_pair_name,
+        'Team1': team1,
+        'Team2': team2,
+        'TotalMatches': total_matches,
+        f'{team1}_Wins': team1_wins,
+        f'{team2}_Wins': team2_wins,
+        f'Avg_Margin_{team1}': avg_margin_team1,
+        f'Avg_Margin_{team2}': avg_margin_team2,
+        f'{team1}_BatFirst_Wins': team1_bat_first_wins,
+        f'{team1}_BowlFirst_Wins': team1_bowl_first_wins,
+        f'{team2}_BatFirst_Wins': team2_bat_first_wins,
+        f'{team2}_BowlFirst_Wins': team2_bowl_first_wins,
+        f'{team1}_WinPercentage': team1_win_percentage,
+        f'{team2}_WinPercentage': team2_win_percentage
+    }
+
+# Apply the function to each team pair group
+head_to_head_stats_list = filtered_recent_matches_df.groupby('TeamPair').apply(analyze_team_pair_head_to_head).tolist()
+
+# Convert the list of dictionaries to a DataFrame
+head_to_head_stats_df = pd.DataFrame(head_to_head_stats_list)
+
+# final result display
+st.dataframe(head_to_head_stats_df)
