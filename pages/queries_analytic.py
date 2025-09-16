@@ -369,3 +369,65 @@ try:
     st.dataframe(last_20_matches_df)
 except Exception as e:
     st.error(f"Error executing Question 10 query: {e}")
+
+
+st.header("Question 11 Compare each player's performance across different cricket formats. For players who have played at least 2 different formats, show their total runs in Test cricket, ODI cricket, and T20I cricket, along with their overall batting average across all formats.")
+st.markdown("Player recently form thats i fetch in crickbuzz api")
+
+# Fetch batting stats and player info from conn3
+query_batting_stats = """
+SELECT
+    player_id,
+    "Runs - Test",
+    "Innings - Test",
+    "Not Out - Test",
+    "Runs - ODI",
+    "Innings - ODI",
+    "Not Out - ODI",
+    "Runs - T20",
+    "Innings - T20",
+    "Not Out - T20"
+FROM
+    batting_stats;
+"""
+batting_stats_df = pd.read_sql_query(query_batting_stats, conn3)
+
+query_players = """
+SELECT
+    id AS player_id,
+    fullName
+FROM
+    players;
+"""
+players_df = pd.read_sql_query(query_players, conn3)
+
+# Merge dataframes
+merged_df = pd.merge(batting_stats_df, players_df, on='player_id')
+
+# Calculate total runs and dismissals across formats
+merged_df['TotalRunsOverall'] = merged_df['Runs - Test'].fillna(0) + merged_df['Runs - ODI'].fillna(0) + merged_df['Runs - T20'].fillna(0)
+merged_df['TotalInningsOverall'] = merged_df['Innings - Test'].fillna(0) + merged_df['Innings - ODI'].fillna(0) + merged_df['Innings - T20'].fillna(0)
+merged_df['TotalNotOutOverall'] = merged_df['Not Out - Test'].fillna(0) + merged_df['Not Out - ODI'].fillna(0) + merged_df['Not Out - T20'].fillna(0)
+merged_df['TotalDismissalsOverall'] = merged_df['TotalInningsOverall'] - merged_df['TotalNotOutOverall']
+
+# Calculate overall batting average, handle division by zero
+merged_df['OverallAverage'] = merged_df.apply(
+    lambda row: row['TotalRunsOverall'] / row['TotalDismissalsOverall'] if row['TotalDismissalsOverall'] > 0 else 0,
+    axis=1
+)
+
+# Determine the number of formats played
+merged_df['FormatsPlayed'] = merged_df.apply(
+    lambda row: sum([
+        1 if row['Innings - Test'] > 0 else 0,
+        1 if row['Innings - ODI'] > 0 else 0,
+        1 if row['Innings - T20'] > 0 else 0
+    ]),
+    axis=1
+)
+
+# Filter for players who played in at least 2 formats
+multi_format_players_df = merged_df[merged_df['FormatsPlayed'] >= 2].copy()
+
+# final result display
+st.dataframe(multi_format_players_df[['fullName', 'Runs - Test', 'Runs - ODI', 'Runs - T20', 'OverallAverage']].drop_duplicates())
