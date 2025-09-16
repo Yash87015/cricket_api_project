@@ -647,6 +647,6 @@ innings_partnerships_df = pd.read_sql_query(query_innings_partnerships_recent, c
 # display result
 try:
     innings_partnerships_df = pd.read_sql_query(query_innings_partnerships_recent, conn3)
-    st.dataframe(lnnings_partnerships_df)
+    st.dataframe(innings_partnerships_df)
 except Exception as e:
     st.error(f"Error executing Question 13 query: {e}")
