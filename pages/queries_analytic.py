@@ -28,7 +28,31 @@ try:
 except Exception as e:
     st.error(f"Error executing Question 1 query: {e}")
 
+st.header("Question 1 Find all players who represent India. Display their full name, playing role, batting style, and bowling style")
+st.markdown("show player list from old data")
+query_india_players = """
+SELECT
+    tp.player_id,
+    tp.player_name,
+    tp.batting_style,
+    tp.bowling_style,
+    tm."Team1 Name" AS country
+FROM
+    t20_player tp
+JOIN
+    t20_match tm ON tp.country_id = tm."Team1 ID"
+WHERE
+    tm."Team1 Name" = 'India'
+GROUP BY
+    tp.player_id;
+"""
 
+try:
+    query_india_players = pd.read_sql_query(query_indian_players, conn2)
+    st.dataframe(query_india_players)
+except exception as e:
+    st.error(f"Error excution question old data 1: {e}")
+    
 st.header("Question 2: Find the average number of matches played by players in different roles.")
 st.markdown("Show the role and the average number of matches played for that role.")
 query_avg_matches_by_role = """
