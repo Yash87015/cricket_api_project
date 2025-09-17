@@ -1953,4 +1953,4 @@ successful_partnerships_df['success_rate'] = (successful_partnerships_df['partne
 
 
 # final result display
-st.dataframe((successful_partnerships_df.sort_values(by=['success_rate', 'highest_partnership_score'], ascending=[False, False]))
+st.dataframe((successful_partnerships_df.sort_values(by=['success_rate', 'highest_partnership_score'], ascending=[False, False])))
