@@ -173,7 +173,7 @@ conn = sqlite3.connect(db_path)
 
 1. Clone the repository:
 
-git clone https://github.com/your-username/Cricket-Analytics-Dashboard.git
+git clone https://github.com/Yash87015/cricket_api_project/tree/main
 cd Cricket-Analytics-Dashboard
 
 
