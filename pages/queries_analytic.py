@@ -1742,7 +1742,7 @@ head_to_head_stats_df = pd.DataFrame(head_to_head_stats_list)
 st.dataframe(head_to_head_stats_df)
 
 st.header("Question 23 Analyze recent player form and momentum. For each player's last 10 batting performances, calculate: Average runs in their last 5 matches vs their last 10 matches")
-st.markdown("Recent strike rate trends Number of scores above 50 in recent matches A consistency score based on standard deviation ,Based on these metrics, categorize players as being in "Excellent Form", "Good Form", "Average Form", or "Poor Form".")
+st.markdown("Recent strike rate trends Number of scores above 50 in recent matches A consistency score based on standard deviation ,Based on these metrics, categorize players as being in \"Excellent Form\", \"Good Form\", \"Average Form\", or \"Poor Form\".")
 
 query_odi_batting_performance = """
 SELECT
