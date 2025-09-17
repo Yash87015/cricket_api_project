@@ -1,7 +1,7 @@
 # cricket_api_project
 
 ---
-
+streamlit :- https://cricketapiproject-w8k27gnj8bydfjxubneujm.streamlit.app
 🏏 Cricket Analytics Dashboard
 
 📌 Project Overview
