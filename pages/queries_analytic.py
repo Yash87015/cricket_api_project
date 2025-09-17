@@ -1954,3 +1954,391 @@ successful_partnerships_df['success_rate'] = (successful_partnerships_df['partne
 
 # final result display
 st.dataframe((successful_partnerships_df.sort_values(by=['success_rate', 'highest_partnership_score'], ascending=[False, False])))
+
+
+st.header("Question 25 Perform a time-series analysis of player performance evolution. Track how each player's batting performance changes over time by:")
+st.markdown("Calculating quarterly averages for runs and strike rate,Comparing each quarter's performance to the previous quarter,Identifying whether performance is improving, declining, or stable,Determining overall career trajectory over the last few years,Categorizing players' career phase as "Career Ascending", "Career Declining", or "Career Stable",Only analyze players with data spanning at least 6 quarters and a minimum of 3 matches per quarter.")
+
+query_odi_batting = """
+SELECT
+    batsman AS player_id,
+    runs,
+    balls,
+    "Match Date" AS match_date
+FROM
+    odi_bat;
+"""
+odi_batting_df = pd.read_sql_query(query_odi_batting, conn1)
+
+query_t20_batting = """
+SELECT
+    batsman AS player_id,
+    runs,
+    balls,
+    "Match Date" AS match_date
+FROM
+    t20_bat;
+"""
+t20_batting_df = pd.read_sql_query(query_t20_batting, conn2)
+
+combined_batting_df = pd.concat([odi_batting_df, t20_batting_df], ignore_index=True)
+
+combined_batting_df['match_date'] = pd.to_datetime(combined_batting_df['match_date'], errors='coerce')
+
+query_odi_batting = """
+SELECT
+    ob.batsman AS player_id,
+    ob.runs,
+    ob.balls,
+    om."Match Date" AS match_date
+FROM
+    odi_bat ob
+JOIN
+    odi_match om ON ob."Match ID" = om."Match ID";
+"""
+odi_batting_df = pd.read_sql_query(query_odi_batting, conn1)
+
+query_t20_batting = """
+SELECT
+    tb.batsman AS player_id,
+    tb.runs,
+    tb.balls,
+    tm."Match Date" AS match_date
+FROM
+    t20_bat tb
+JOIN
+    t20_match tm ON tb."Match ID" = tm."Match ID";
+"""
+t20_batting_df = pd.read_sql_query(query_t20_batting, conn2)
+
+combined_batting_df = pd.concat([odi_batting_df, t20_batting_df], ignore_index=True)
+
+combined_batting_df['match_date'] = pd.to_datetime(combined_batting_df['match_date'], errors='coerce')
+
+combined_batting_df['match_date'] = pd.to_datetime(combined_batting_df['match_date'], errors='coerce')
+combined_batting_df['match_year'] = combined_batting_df['match_date'].dt.year
+combined_batting_df['match_quarter'] = combined_batting_df['match_date'].dt.quarter
+combined_batting_df['year_quarter'] = combined_batting_df['match_year'].astype(str) + '-Q' + combined_batting_df['match_quarter'].astype(str)
+
+query_odi_batting = """
+SELECT
+    ob.batsman AS player_id,
+    ob.runs,
+    ob.balls,
+    om."Match Date" AS match_date,
+    om."Match ID" AS "Match ID"
+FROM
+    odi_bat ob
+JOIN
+    odi_match om ON ob."Match ID" = om."Match ID";
+"""
+odi_batting_df = pd.read_sql_query(query_odi_batting, conn1)
+
+query_t20_batting = """
+SELECT
+    tb.batsman AS player_id,
+    tb.runs,
+    tb.balls,
+    tm."Match Date" AS match_date,
+    tm."Match ID" AS "Match ID"
+FROM
+    t20_bat tb
+JOIN
+    t20_match tm ON tb."Match ID" = tm."Match ID";
+"""
+t20_batting_df = pd.read_sql_query(query_t20_batting, conn2)
+
+combined_batting_df = pd.concat([odi_batting_df, t20_batting_df], ignore_index=True)
+
+combined_batting_df['match_date'] = pd.to_datetime(combined_batting_df['match_date'], errors='coerce')
+combined_batting_df['match_year'] = combined_batting_df['match_date'].dt.year
+combined_batting_df['match_quarter'] = combined_batting_df['match_date'].dt.quarter
+combined_batting_df['year_quarter'] = combined_batting_df['match_year'].astype(str) + '-Q' + combined_batting_df['match_quarter'].astype(str)
+
+quarterly_performance_df = combined_batting_df.groupby(['player_id', 'year_quarter']).agg(
+    total_runs=('runs', 'sum'),
+    total_balls=('balls', 'sum'),
+    matches_played=('Match ID', 'nunique')
+).reset_index()
+
+quarterly_performance_df = combined_batting_df.groupby(['player_id', 'year_quarter']).agg(
+    total_runs=('runs', 'sum'),
+    total_balls=('balls', 'sum'),
+    matches_played=('Match ID', 'nunique')
+).reset_index()
+
+quarterly_performance_df = quarterly_performance_df[quarterly_performance_df['matches_played'] >= 3].copy()
+
+player_quarter_counts = quarterly_performance_df.groupby('player_id').size().reset_index(name='num_quarters')
+players_with_enough_quarters = player_quarter_counts[player_quarter_counts['num_quarters'] >= 6]['player_id'].tolist()
+
+filtered_quarterly_performance_df = quarterly_performance_df[
+    quarterly_performance_df['player_id'].isin(players_with_enough_quarters)
+].copy()
+
+filtered_quarterly_performance_df['average_runs'] = filtered_quarterly_performance_df['total_runs'] / filtered_quarterly_performance_df['matches_played']
+filtered_quarterly_performance_df['strike_rate'] = (filtered_quarterly_performance_df['total_runs'] / filtered_quarterly_performance_df['total_balls']) * 100
+
+filtered_quarterly_performance_df['year_quarter_str'] = filtered_quarterly_performance_df['year_quarter'].astype(str).str.replace('.0', '', regex=False)
+
+def safe_int_split(x, separator, index):
+    if pd.isna(x) or separator not in x:
+        return None
+    try:
+        return int(x.split(separator)[index])
+    except (ValueError, IndexError):
+        return None
+
+filtered_quarterly_performance_df['year'] = filtered_quarterly_performance_df['year_quarter_str'].apply(lambda x: safe_int_split(x, '-', 0))
+filtered_quarterly_performance_df['quarter'] = filtered_quarterly_performance_df['year_quarter_str'].apply(lambda x: safe_int_split(x, 'Q', 1))
+
+filtered_quarterly_performance_df = filtered_quarterly_performance_df.dropna(subset=['year', 'quarter']).copy()
+
+filtered_quarterly_performance_df['year'] = filtered_quarterly_performance_df['year'].astype(int)
+filtered_quarterly_performance_df['quarter'] = filtered_quarterly_performance_df['quarter'].astype(int)
+
+filtered_quarterly_performance_df = filtered_quarterly_performance_df.sort_values(by=['player_id', 'year', 'quarter'])
+
+filtered_quarterly_performance_df['prev_quarter_avg_runs'] = filtered_quarterly_performance_df.groupby('player_id')['average_runs'].shift(1)
+filtered_quarterly_performance_df['prev_quarter_strike_rate'] = filtered_quarterly_performance_df.groupby('player_id')['strike_rate'].shift(1)
+
+def performance_trend(current, previous):
+    if pd.isna(previous):
+        return 'Stable'
+    if current > previous * 1.1:
+        return 'Improving'
+    elif current < previous * 0.9:
+        return 'Declining'
+    else:
+        return 'Stable'
+
+filtered_quarterly_performance_df['runs_trend'] = filtered_quarterly_performance_df.apply(
+    lambda row: performance_trend(row['average_runs'], row['prev_quarter_avg_runs']), axis=1
+)
+filtered_quarterly_performance_df['sr_trend'] = filtered_quarterly_performance_df.apply(
+    lambda row: performance_trend(row['strike_rate'], row['prev_quarter_strike_rate']), axis=1
+)
+
+def career_trajectory(df):
+    if len(df) < 6:
+        return 'Not enough data'
+
+    # Ensure data is sorted by year and quarter before taking head/tail
+    df_sorted = df.sort_values(by=['year', 'quarter']).reset_index(drop=True)
+
+    recent_avg_runs = df_sorted['average_runs'].tail(3).mean()
+    earlier_avg_runs = df_sorted['average_runs'].head(3).mean()
+
+    # Handle cases where earlier average runs is zero to avoid division by zero
+    if earlier_avg_runs == 0:
+        if recent_avg_runs > 0:
+            return 'Career Ascending'
+        else:
+            return 'Career Stable'
+
+    percentage_change = (recent_avg_runs - earlier_avg_runs) / earlier_avg_runs
+
+    if percentage_change > 0.2: # More than 20% increase
+        return 'Career Ascending'
+    elif percentage_change < -0.2: # More than 20% decrease
+        return 'Career Declining'
+    else:
+        return 'Career Stable'
+
+player_trajectory = filtered_quarterly_performance_df.groupby('player_id').apply(career_trajectory).reset_index()
+player_trajectory.rename(columns={0: 'career_trajectory'}, inplace=True)
+
+# Merge the career trajectory information back to the filtered quarterly performance DataFrame
+final_player_performance_evolution_df = pd.merge(
+    filtered_quarterly_performance_df,
+    player_trajectory,
+    on='player_id',
+    how='left'
+)
+
+
+query_odi_player_names = """SELECT player_id, player_name FROM odi_player;"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """SELECT player_id, player_name FROM t20_player;"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+query_players_names_conn3 = """SELECT id AS player_id, fullName AS player_name FROM players;"""
+players_names_conn3_df = pd.read_sql_query(query_players_names_conn3, conn3)
+
+
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df, players_names_conn3_df]).drop_duplicates(subset=['player_id'])
+
+final_player_performance_evolution_df = pd.merge(final_player_performance_evolution_df, combined_player_names_df, on='player_id', how='left')
+
+player_quarter_counts = quarterly_performance_df.groupby('player_id').size().reset_index(name='num_quarters')
+players_with_enough_quarters = player_quarter_counts[player_quarter_counts['num_quarters'] >= 6]['player_id'].tolist()
+
+filtered_quarterly_performance_df = quarterly_performance_df[
+    quarterly_performance_df['player_id'].isin(players_with_enough_quarters)
+].copy()
+
+filtered_quarterly_performance_df['year_quarter_str'] = filtered_quarterly_performance_df['year_quarter'].astype(str).str.replace('.0', '', regex=False)
+
+def safe_int_split(x, separator, index):
+    if pd.isna(x) or separator not in x:
+        return None
+    try:
+        return int(x.split(separator)[index])
+    except (ValueError, IndexError):
+        return None
+
+filtered_quarterly_performance_df['year'] = filtered_quarterly_performance_df['year_quarter_str'].apply(lambda x: safe_int_split(x, '-', 0))
+filtered_quarterly_performance_df['quarter'] = filtered_quarterly_performance_df['year_quarter_str'].apply(lambda x: safe_int_split(x, 'Q', 1))
+
+filtered_quarterly_performance_df = filtered_quarterly_performance_df.dropna(subset=['year', 'quarter']).copy()
+
+filtered_quarterly_performance_df['year'] = filtered_quarterly_performance_df['year'].astype(int)
+filtered_quarterly_performance_df['quarter'] = filtered_quarterly_performance_df['quarter'].astype(int)
+
+filtered_quarterly_performance_df = filtered_quarterly_performance_df.sort_values(by=['player_id', 'year', 'quarter'])
+
+filtered_quarterly_performance_df['average_runs'] = filtered_quarterly_performance_df['total_runs'] / filtered_quarterly_performance_df['matches_played']
+filtered_quarterly_performance_df['strike_rate'] = (filtered_quarterly_performance_df['total_runs'] / filtered_quarterly_performance_df['total_balls']) * 100
+
+filtered_quarterly_performance_df['prev_quarter_avg_runs'] = filtered_quarterly_performance_df.groupby('player_id')['average_runs'].shift(1)
+filtered_quarterly_performance_df['prev_quarter_strike_rate'] = filtered_quarterly_performance_df.groupby('player_id')['strike_rate'].shift(1)
+
+def performance_trend(current, previous):
+    if pd.isna(previous):
+        return 'Stable'
+    if current > previous * 1.1:
+        return 'Improving'
+    elif current < previous * 0.9:
+        return 'Declining'
+    else:
+        return 'Stable'
+
+filtered_quarterly_performance_df['runs_trend'] = filtered_quarterly_performance_df.apply(
+    lambda row: performance_trend(row['average_runs'], row['prev_quarter_avg_runs']), axis=1
+)
+filtered_quarterly_performance_df['sr_trend'] = filtered_quarterly_performance_df.apply(
+    lambda row: performance_trend(row['strike_rate'], row['prev_quarter_strike_rate']), axis=1
+)
+
+def career_trajectory(df):
+    if len(df) < 6:
+        return 'Not enough data'
+
+    # Ensure data is sorted by year and quarter before taking head/tail
+    df_sorted = df.sort_values(by=['year', 'quarter']).reset_index(drop=True)
+
+    recent_avg_runs = df_sorted['average_runs'].tail(3).mean()
+    earlier_avg_runs = df_sorted['average_runs'].head(3).mean()
+
+    # Handle cases where earlier average runs is zero to avoid division by zero
+    if earlier_avg_runs == 0:
+        if recent_avg_runs > 0:
+            return 'Career Ascending'
+        else:
+            return 'Career Stable'
+
+    percentage_change = (recent_avg_runs - earlier_avg_runs) / earlier_avg_runs
+
+    if percentage_change > 0.2: # More than 20% increase
+        return 'Career Ascending'
+    elif percentage_change < -0.2: # More than 20% decrease
+        return 'Career Declining'
+    else:
+        return 'Career Stable'
+
+player_trajectory = filtered_quarterly_performance_df.groupby('player_id').apply(career_trajectory).reset_index()
+player_trajectory.rename(columns={0: 'career_trajectory'}, inplace=True)
+
+# Merge the career trajectory information back to the filtered quarterly performance DataFrame
+final_player_performance_evolution_df = pd.merge(
+    filtered_quarterly_performance_df,
+    player_trajectory,
+    on='player_id',
+    how='left'
+)
+
+# Display the head of the updated DataFrame with the new column
+query_odi_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    odi_player;
+"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    t20_player;
+"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+query_players_names_conn3 = """
+SELECT
+    id AS player_id,
+    fullName AS player_name
+FROM
+    players;
+"""
+players_names_conn3_df = pd.read_sql_query(query_players_names_conn3, conn3)
+
+
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df, players_names_conn3_df]).drop_duplicates(subset=['player_id'])
+
+final_player_performance_evolution_df = pd.merge(final_player_performance_evolution_df, combined_player_names_df, on='player_id', how='left')
+
+def categorize_career_phase(df):
+    if len(df) < 6:
+        return 'Not enough data'
+
+    # Get the overall career trajectory
+    trajectory = df['career_trajectory'].iloc[0]
+
+    # Analyze recent trends (last 3 quarters)
+    recent_trends = df.tail(3)
+    runs_improving_recent = (recent_trends['runs_trend'] == 'Improving').sum()
+    sr_improving_recent = (recent_trends['sr_trend'] == 'Improving').sum()
+    runs_declining_recent = (recent_trends['runs_trend'] == 'Declining').sum()
+    sr_declining_recent = (recent_trends['sr_trend'] == 'Declining').sum()
+
+    # Categorization logic (example criteria)
+    if trajectory == 'Career Ascending' and (runs_improving_recent >= 2 or sr_improving_recent >= 2):
+        return 'Career Ascending'
+    elif trajectory == 'Career Declining' and (runs_declining_recent >= 2 or sr_declining_recent >= 2):
+        return 'Career Declining'
+    elif trajectory == 'Career Stable' and (runs_improving_recent + sr_improving_recent >= runs_declining_recent + sr_declining_recent):
+        return 'Career Stable'
+    elif runs_improving_recent >= 2 or sr_improving_recent >= 2:
+         return 'Career Ascending' # Improving in recent quarters even if overall trajectory is not strongly ascending
+    elif runs_declining_recent >= 2 or sr_declining_recent >= 2:
+         return 'Career Declining' # Declining in recent quarters
+    else:
+        return 'Career Stable' # Mixed or stable trends
+
+player_career_phase = final_player_performance_evolution_df.groupby('player_id').apply(categorize_career_phase).reset_index()
+player_career_phase.rename(columns={0: 'career_phase_category'}, inplace=True)
+
+final_player_performance_evolution_with_phase_df = pd.merge(
+    final_player_performance_evolution_df,
+    player_career_phase,
+    on='player_id',
+    how='left'
+)
+
+
+
+# final result display
+st.dataframe((final_player_performance_evolution_with_phase_df[[
+    'player_name',
+    'year_quarter',
+    'average_runs',
+    'strike_rate',
+    'runs_trend',
+    'sr_trend',
+    'career_trajectory',
+    'career_phase_category'
+]]))
