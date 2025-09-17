@@ -1830,3 +1830,127 @@ final_recent_form_df = pd.merge(player_recent_form, combined_player_names_df, on
 
 # final result display
 st.dataframe(final_recent_form_df[['player_name', 'avg_runs_last_5', 'avg_runs_last_10', 'recent_strike_rate', 'scores_above_50', 'consistency_score', 'form_category']].sort_values(by='form_category'))
+
+
+st.header("Question 24 Study successful batting partnerships to identify the best player combinations. For pairs of players who have batted together as consecutive batsmen (positions differ by 1) in at least 5 partnerships:")
+st.markdown("Calculate their average partnership runs Count how many of their partnerships exceeded 50 runs,Find their highest partnership score Calculate their success rate (percentage of good partnerships),Rank the most successful batting partnerships.")
+
+query_odi_partnerships = """
+SELECT
+    player1,
+    player2,
+    "partnership runs",
+    innings,
+    "Match ID"
+FROM
+    odi_pat;
+"""
+odi_partnerships_df = pd.read_sql_query(query_odi_partnerships, conn1)
+
+query_t20_partnerships = """
+SELECT
+    player1,
+    player2,
+    "partnership runs",
+    innings,
+    "Match ID"
+FROM
+    t20_pat;
+"""
+t20_partnerships_df = pd.read_sql_query(query_t20_partnerships, conn2)
+
+query_innings_partnerships = """
+SELECT
+    bat1Id,
+    bat2Id,
+    totalRuns,
+    inningsId,
+    matchId
+FROM
+    innings_stats
+WHERE
+    playerType = 'Partnership';
+"""
+innings_partnerships_df = pd.read_sql_query(query_innings_partnerships, conn3)
+
+innings_partnerships_df.rename(columns={
+    'bat1Id': 'player1',
+    'bat2Id': 'player2',
+    'totalRuns': 'partnership runs',
+    'inningsId': 'innings',
+    'matchId': 'Match ID'
+}, inplace=True)
+
+combined_partnerships_df = pd.concat([odi_partnerships_df, t20_partnerships_df, innings_partnerships_df], ignore_index=True)
+
+query_odi_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    odi_player;
+"""
+odi_player_names_df = pd.read_sql_query(query_odi_player_names, conn1)
+
+query_t20_player_names = """
+SELECT
+    player_id,
+    player_name
+FROM
+    t20_player;
+"""
+t20_player_names_df = pd.read_sql_query(query_t20_player_names, conn2)
+
+query_players_names_conn3 = """
+SELECT
+    id AS player_id,
+    fullName AS player_name
+FROM
+    players;
+"""
+players_names_conn3_df = pd.read_sql_query(query_players_names_conn3, conn3)
+
+combined_player_names_df = pd.concat([odi_player_names_df, t20_player_names_df, players_names_conn3_df]).drop_duplicates(subset=['player_id'])
+
+combined_partnerships_with_names_df = combined_partnerships_df.merge(
+    combined_player_names_df.rename(columns={'player_id': 'player1_id', 'player_name': 'player1_name'}),
+    left_on='player1',
+    right_on='player1_id',
+    how='left'
+).merge(
+    combined_player_names_df.rename(columns={'player_id': 'player2_id', 'player_name': 'player2_name'}),
+    left_on='player2',
+    right_on='player2_id',
+    how='left'
+)
+
+# Drop the extra player_id columns
+combined_partnerships_with_names_df.drop(columns=['player1_id', 'player2_id'], inplace=True)
+
+# Filter for partnerships with valid player names
+filtered_partnerships_df = combined_partnerships_with_names_df.dropna(subset=['player1_name', 'player2_name']).copy()
+
+# Create a unique pair identifier (sorted alphabetically to handle both player1-player2 and player2-player1)
+filtered_partnerships_df['player_pair'] = filtered_partnerships_df.apply(
+    lambda row: '_'.join(sorted([row['player1_name'], row['player2_name']])), axis=1
+)
+
+# Group by player pair and calculate partnership statistics
+partnership_stats_df = filtered_partnerships_df.groupby('player_pair').agg(
+    total_partnerships=('Match ID', 'count'),
+    average_partnership_runs=('partnership runs', 'mean'),
+    partnerships_over_50=('partnership runs', lambda x: (x >= 50).sum()),
+    highest_partnership_score=('partnership runs', 'max')
+).reset_index()
+
+# Filter for player pairs with at least 5 partnerships
+successful_partnerships_df = partnership_stats_df[partnership_stats_df['total_partnerships'] >= 5].copy()
+
+# Calculate success rate (percentage of partnerships over 50)
+successful_partnerships_df['success_rate'] = (successful_partnerships_df['partnerships_over_50'] / successful_partnerships_df['total_partnerships']) * 100
+
+
+
+
+# final result display
+st.dataframe((successful_partnerships_df.sort_values(by=['success_rate', 'highest_partnership_score'], ascending=[False, False]))
