@@ -1957,7 +1957,7 @@ st.dataframe((successful_partnerships_df.sort_values(by=['success_rate', 'highes
 
 
 st.header("Question 25 Perform a time-series analysis of player performance evolution. Track how each player's batting performance changes over time by:")
-st.markdown("Calculating quarterly averages for runs and strike rate,Comparing each quarter's performance to the previous quarter,Identifying whether performance is improving, declining, or stable,Determining overall career trajectory over the last few years,Categorizing players' career phase as "Career Ascending", "Career Declining", or "Career Stable",Only analyze players with data spanning at least 6 quarters and a minimum of 3 matches per quarter.")
+st.markdown("Calculating quarterly averages for runs and strike rate,Comparing each quarter's performance to the previous quarter,Identifying whether performance is improving, declining, or stable,Determining overall career trajectory over the last few years,Categorizing players career phase as Career Ascending, Career Declining, or Career Stable,Only analyze players with data spanning at least 6 quarters and a minimum of 3 matches per quarter.")
 
 query_odi_batting = """
 SELECT
