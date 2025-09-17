@@ -48,7 +48,7 @@ Cricket-Analytics-Dashboard/
 │   ├── Top_Player_Stats.py     # Leaderboards (batting & bowling)
 │   ├── CRUD_Operation_Page.py  # Create, Read, Update, Delete on DB
 │   ├── Queries_Analytics_Page.py # 25 SQL-driven analytical questions
-│   └── Analytics_Page.py       # (optional extra analytics, charts)
+│   
 │
 ├── databases/                  # SQLite Databases
 │   ├── odi.db
